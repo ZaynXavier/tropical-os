@@ -2,6 +2,15 @@
 
 return [
 
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY', ''),
+        'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
+    ],
+
+    'whatsapp' => [
+        'gateway_url' => env('WA_GATEWAY_URL', 'http://127.0.0.1:5001'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

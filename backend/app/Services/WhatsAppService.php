@@ -11,7 +11,7 @@ class WhatsAppService
 
     public function __construct()
     {
-        $this->gatewayUrl = rtrim(env('WA_GATEWAY_URL', 'http://127.0.0.1:3000'), '/');
+        $this->gatewayUrl = rtrim((string) config('services.whatsapp.gateway_url', 'http://127.0.0.1:5001'), '/');
     }
 
     /**

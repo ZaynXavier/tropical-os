@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tropical-bawah-migrate
+  namespace: test-app
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: tropical-bawah-migrate
+    spec:
+      restartPolicy: Never
+
+      hostAliases:
+        - ip: "__DB_IP__"
+          hostnames:
+            - "__DB_HOST__"
+
+      containers:
+        - name: migrate
+          image: __API_IMAGE__
+          imagePullPolicy: Always
+
+          command:
+            - php
+            - artisan
+            - migrate
+            - --force
+
+          envFrom:
+            - configMapRef:
+                name: tropical-bawah-config
+            - secretRef:
+                name: tropical-bawah-secret
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

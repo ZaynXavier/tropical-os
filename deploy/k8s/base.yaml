@@ -1,0 +1,257 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tropical-bawah-config
+  namespace: test-app
+data:
+  APP_NAME: "TropicalOS"
+  APP_ENV: "production"
+  APP_DEBUG: "false"
+  APP_TIMEZONE: "Asia/Jakarta"
+  APP_URL: "__APP_URL__"
+
+  LOG_CHANNEL: "stderr"
+  LOG_LEVEL: "info"
+
+  DB_CONNECTION: "mysql"
+  DB_HOST: "__DB_HOST__"
+  DB_PORT: "3306"
+
+  SESSION_DRIVER: "database"
+  QUEUE_CONNECTION: "database"
+  CACHE_STORE: "database"
+
+  WA_GATEWAY_URL: "http://tropical-bawah-wa:5001"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tropical-bawah-api
+  namespace: test-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tropical-bawah-api
+  template:
+    metadata:
+      labels:
+        app: tropical-bawah-api
+    spec:
+      hostAliases:
+        - ip: "__DB_IP__"
+          hostnames:
+            - "__DB_HOST__"
+
+      containers:
+        - name: api
+          image: __API_IMAGE__
+          imagePullPolicy: Always
+
+          command:
+            - /bin/sh
+            - -c
+            - |
+              php artisan optimize:clear
+              exec php artisan serve --host=0.0.0.0 --port=8000
+
+          envFrom:
+            - configMapRef:
+                name: tropical-bawah-config
+            - secretRef:
+                name: tropical-bawah-secret
+
+          ports:
+            - containerPort: 8000
+
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tropical-bawah-api
+  namespace: test-app
+spec:
+  type: ClusterIP
+  selector:
+    app: tropical-bawah-api
+  ports:
+    - port: 8000
+      targetPort: 8000
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tropical-bawah-wa-data
+  namespace: test-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tropical-bawah-wa
+  namespace: test-app
+spec:
+  replicas: 1
+
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: tropical-bawah-wa
+
+  template:
+    metadata:
+      labels:
+        app: tropical-bawah-wa
+    spec:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+
+      initContainers:
+        - name: fix-wa-data-permissions
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              chown -R 1000:1000 /data
+              chmod -R 775 /data
+
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+
+          volumeMounts:
+            - name: wa-data
+              mountPath: /data
+
+      containers:
+        - name: wa
+          image: __WA_IMAGE__
+          imagePullPolicy: Always
+
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+
+          ports:
+            - containerPort: 5001
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+
+          volumeMounts:
+            - name: wa-data
+              mountPath: /data
+
+      volumes:
+        - name: wa-data
+          persistentVolumeClaim:
+            claimName: tropical-bawah-wa-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tropical-bawah-wa
+  namespace: test-app
+spec:
+  type: ClusterIP
+  selector:
+    app: tropical-bawah-wa
+  ports:
+    - port: 5001
+      targetPort: 5001
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tropical-bawah-web
+  namespace: test-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tropical-bawah-web
+
+  template:
+    metadata:
+      labels:
+        app: tropical-bawah-web
+    spec:
+      containers:
+        - name: web
+          image: __WEB_IMAGE__
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 80
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tropical-bawah-web
+  namespace: test-app
+spec:
+  type: ClusterIP
+  selector:
+    app: tropical-bawah-web
+  ports:
+    - port: 80
+      targetPort: 80

@@ -7,7 +7,8 @@
 
 const GEMINI_DIRECT_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const GEMINI_DIRECT_MODEL = 'gemini-2.0-flash';
-const BACKEND_API_BASE_URL = 'http://localhost:8000/api/v1/ai';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const BACKEND_API_BASE_URL = `${API_BASE_URL}/ai`;
 
 export interface AiAnalysisResponse {
   success: boolean;

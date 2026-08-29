@@ -6,7 +6,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } f
  * Connects React frontend to Laravel 11 API Backend (REST / Sanctum).
  */
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api/v1';
 export const SESSION_STORAGE_KEY = 'tropicalos_auth_session';
 
 export interface ApiResponse<T = any> {
