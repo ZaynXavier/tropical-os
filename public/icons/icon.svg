@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B0F19" />
+      <stop offset="50%" stop-color="#111827" />
+      <stop offset="100%" stop-color="#064E3B" />
+    </linearGradient>
+    <linearGradient id="emerald-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34D399" />
+      <stop offset="50%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="gold-accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCD34D" />
+      <stop offset="100%" stop-color="#F59E0B" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#10B981" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Background Rounded Rect -->
+  <rect width="512" height="512" rx="128" fill="url(#bg-grad)" />
+  <rect width="504" height="504" x="4" y="4" rx="124" fill="none" stroke="#10B981" stroke-opacity="0.2" stroke-width="4" />
+
+  <!-- Tropical Leaf Motif -->
+  <g filter="url(#shadow)" transform="translate(256, 230)">
+    <!-- Central Stem -->
+    <path d="M0,130 Q-5,-10 0,-140" stroke="url(#emerald-glow)" stroke-width="12" stroke-linecap="round" fill="none" />
+    
+    <!-- Left Fronds -->
+    <path d="M-5,70 C-50,60 -110,40 -120,0 C-100,-15 -45,15 -5,10" fill="url(#emerald-glow)" />
+    <path d="M-5,10 C-60,-5 -120,-30 -130,-70 C-105,-80 -45,-40 -5,-50" fill="url(#emerald-glow)" />
+    <path d="M-5,-50 C-50,-70 -100,-95 -105,-130 C-85,-135 -40,-100 -5,-105" fill="url(#emerald-glow)" />
+    <path d="M-2,-105 C-30,-125 -60,-145 -60,-165 C-45,-165 -20,-140 0,-140" fill="url(#emerald-glow)" />
+
+    <!-- Right Fronds -->
+    <path d="M5,70 C50,60 110,40 120,0 C100,-15 45,15 5,10" fill="url(#emerald-glow)" opacity="0.9" />
+    <path d="M5,10 C60,-5 120,-30 130,-70 C105,-80 45,-40 5,-50" fill="url(#emerald-glow)" opacity="0.9" />
+    <path d="M5,-50 C50,-70 100,-95 105,-130 C85,-135 40,-100 5,-105" fill="url(#emerald-glow)" opacity="0.9" />
+    <path d="M2,-105 C30,-125 60,-145 60,-165 C45,-165 20,-140 0,-140" fill="url(#emerald-glow)" opacity="0.9" />
+  </g>
+
+  <!-- Crown / Quality Accent Star -->
+  <circle cx="256" cy="70" r="10" fill="url(#gold-accent)" />
+  <polygon points="256,52 260,64 272,64 262,72 266,84 256,76 246,84 250,72 240,64 252,64" fill="url(#gold-accent)" transform="translate(256, 70) scale(0.6) translate(-256, -70)" />
+
+  <!-- TropicalOS Typography -->
+  <text x="256" y="415" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="900" letter-spacing="4" fill="#FFFFFF">
+    TROPICAL<tspan fill="#10B981">OS</tspan>
+  </text>
+  <text x="256" y="450" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" letter-spacing="6" fill="#9CA3AF">
+    RESTAURANT OS
+  </text>
+</svg>

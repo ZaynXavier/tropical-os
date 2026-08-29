@@ -1,0 +1,43 @@
+{
+  "name": "TropicalOS — Restaurant Operating System",
+  "short_name": "TropicalOS",
+  "description": "Sistem Operasional Terpadu Tropical Garden Resto",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0B0F19",
+  "theme_color": "#10B981",
+  "categories": ["business", "productivity", "food"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Presensi / Clock In",
+      "short_name": "Presensi",
+      "description": "Buka modul presensi GPS & selfie",
+      "url": "/mobile?sub=attendance",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Checklist Stasiun",
+      "short_name": "Checklist",
+      "description": "Checklist operasional shift",
+      "url": "/mobile?sub=checklists",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Lapor Kendala",
+      "short_name": "Issue Log",
+      "description": "Laporkan kendala operasional / alat",
+      "url": "/mobile?sub=issues",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}

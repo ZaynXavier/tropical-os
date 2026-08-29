@@ -1,0 +1,6 @@
+{
+  "name": "TropicalOS",
+  "description": "Restaurant Operating System khusus untuk Tropical Garden Resto",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
