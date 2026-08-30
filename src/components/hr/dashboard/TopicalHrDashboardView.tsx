@@ -446,14 +446,14 @@ export const TopicalHrDashboardView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#2D374E]">
-                  {INITIAL_EMPLOYEES.filter((e) =>
-                    e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    e.department.toLowerCase().includes(searchTerm.toLowerCase())
+                  {employees.filter((e) =>
+                    (e.name || e.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (e.department || '').toLowerCase().includes(searchTerm.toLowerCase())
                   ).slice(0, 8).map((emp, i) => (
                     <tr key={emp.id} className="hover:bg-[#111827]/50">
                       <td className="py-3 px-3">
-                        <div className="font-bold text-white">{emp.name}</div>
-                        <div className="text-[11px] text-gray-400">{emp.primaryPosition}</div>
+                        <div className="font-bold text-white">{emp.name || emp.fullName}</div>
+                        <div className="text-[11px] text-gray-400">{emp.primaryPosition || emp.role}</div>
                       </td>
                       <td className="py-3 px-3 text-gray-300">{emp.department}</td>
                       <td className="py-3 px-3 text-gray-300">08:00 - 16:00 (Pagi)</td>
