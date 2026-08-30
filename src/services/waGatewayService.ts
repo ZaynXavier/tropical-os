@@ -3,8 +3,9 @@
  * Connects via Laravel Backend or direct to Baileys Microservice on port 5001
  */
 
-const LARAVEL_API_BASE = 'http://localhost:8000/api/v1/whatsapp';
-const DIRECT_WA_GATEWAY = 'http://127.0.0.1:5001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const LARAVEL_API_BASE = `${API_BASE_URL}/whatsapp`;
+const DIRECT_WA_GATEWAY = '/wa-gateway';
 
 export interface WaMessageItem {
   id: string;

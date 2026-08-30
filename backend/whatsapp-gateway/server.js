@@ -21,8 +21,10 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5001;
-const AUTH_FOLDER = path.join(__dirname, 'auth_info_baileys');
-const STORE_FILE = path.join(__dirname, 'chat_history_store.json');
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+fs.mkdirSync(DATA_DIR, { recursive: true });
+const AUTH_FOLDER = path.join(DATA_DIR, 'auth_info_baileys');
+const STORE_FILE = path.join(DATA_DIR, 'chat_history_store.json');
 
 app.use(cors());
 app.use(express.json());

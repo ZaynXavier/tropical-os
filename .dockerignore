@@ -1,0 +1,7 @@
+.git
+.github
+node_modules
+dist
+backend
+*.zip
+deploy/k8s
