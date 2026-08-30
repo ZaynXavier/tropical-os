@@ -34,15 +34,56 @@ router.post('/employees', async (req: Request, res: Response): Promise<void> => 
         accessLevel: data.accessLevel || 'STAFF',
         additionalResponsibilities: Array.isArray(data.additionalResponsibilities)
           ? data.additionalResponsibilities.join(',')
-          : data.additionalResponsibilities,
-        supervisorId: data.supervisorId,
-        managerId: data.managerId,
+          : data.additionalResponsibilities || '',
+        supervisorId: data.supervisorId || null,
+        managerId: data.managerId || null,
         status: data.status || 'ACTIVE',
         baseSalary: Number(data.baseSalary) || 0,
-        notes: data.notes,
+        notes: data.notes || '',
       },
     });
     res.json({ success: true, data: created, message: 'Karyawan berhasil didaftarkan.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.put('/employees/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+    const updated = await prisma.employee.update({
+      where: { id },
+      data: {
+        ...(data.fullName ? { fullName: data.fullName } : {}),
+        ...(data.email ? { email: data.email } : {}),
+        ...(data.phone ? { phone: data.phone } : {}),
+        ...(data.gender ? { gender: data.gender } : {}),
+        ...(data.employmentStatus ? { employmentStatus: data.employmentStatus } : {}),
+        ...(data.department ? { department: data.department } : {}),
+        ...(data.primaryPosition ? { primaryPosition: data.primaryPosition } : {}),
+        ...(data.accessLevel ? { accessLevel: data.accessLevel } : {}),
+        ...(data.additionalResponsibilities ? {
+          additionalResponsibilities: Array.isArray(data.additionalResponsibilities)
+            ? data.additionalResponsibilities.join(',')
+            : data.additionalResponsibilities
+        } : {}),
+        ...(data.status ? { status: data.status } : {}),
+        ...(data.baseSalary !== undefined ? { baseSalary: Number(data.baseSalary) } : {}),
+        ...(data.notes !== undefined ? { notes: data.notes } : {}),
+      },
+    });
+    res.json({ success: true, data: updated, message: 'Data karyawan berhasil diperbarui.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+router.delete('/employees/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await prisma.employee.delete({ where: { id } });
+    res.json({ success: true, message: 'Karyawan berhasil dihapus.' });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });
   }

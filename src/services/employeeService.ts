@@ -8,13 +8,48 @@ import {
 } from '../types/employee';
 import { INITIAL_EMPLOYEES } from '../data/employees';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const HR_API_BASE = `${API_BASE_URL}/hr`;
 const STORAGE_KEY = 'tropicalos_master_employees';
 const CREDENTIALS_KEY = 'tropicalos_employee_credentials';
 
-// Helper to simulate realistic async network delay
-const delay = (ms = 180) => new Promise((resolve) => setTimeout(resolve, ms));
-
 class EmployeeServiceClass {
+  /**
+   * Helper to map Prisma Employee entity to Frontend Employee type
+   */
+  private mapPrismaToFrontend(emp: any): Employee {
+    const rawResp = emp.additionalResponsibilities;
+    const respArray = typeof rawResp === 'string' && rawResp ? rawResp.split(',') : Array.isArray(rawResp) ? rawResp : [];
+
+    return {
+      id: emp.id,
+      name: emp.fullName || emp.name,
+      fullName: emp.fullName || emp.name,
+      employeeNo: emp.employeeCode || emp.employeeNo,
+      employeeCode: emp.employeeCode || emp.employeeNo,
+      email: emp.email,
+      phone: emp.phone || '-',
+      gender: emp.gender || 'MALE',
+      employmentStatus: emp.employmentStatus || 'PERMANENT',
+      joinDate: emp.joinDate ? (typeof emp.joinDate === 'string' ? emp.joinDate.split('T')[0] : new Date(emp.joinDate).toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
+      department: emp.department || 'Operations',
+      primaryPosition: emp.primaryPosition || emp.role || 'Staff',
+      role: emp.primaryPosition || emp.role || 'Staff',
+      division: emp.department || 'Operations',
+      accessLevel: emp.accessLevel || 'STAFF',
+      additionalResponsibilities: respArray,
+      supervisorId: emp.supervisorId || undefined,
+      managerId: emp.managerId || undefined,
+      status: emp.status || 'ACTIVE',
+      isActive: emp.status === 'ACTIVE',
+      baseSalary: emp.baseSalary || 0,
+      dailyAllowance: emp.dailyAllowance || 0,
+      notes: emp.notes || '',
+      createdAt: emp.createdAt ? String(emp.createdAt) : new Date().toISOString(),
+      updatedAt: emp.updatedAt ? String(emp.updatedAt) : new Date().toISOString(),
+    };
+  }
+
   public getStoredEmployees(): Employee[] {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -27,7 +62,6 @@ class EmployeeServiceClass {
     } catch (e) {
       console.warn('[EmployeeService] Error loading employees from localStorage:', e);
     }
-    // Initialize with master clean personnel (Super Admin)
     this.saveToStorage(INITIAL_EMPLOYEES);
     return INITIAL_EMPLOYEES;
   }
@@ -45,7 +79,6 @@ class EmployeeServiceClass {
     } catch (e) {
       console.warn('[EmployeeService] Error reading credentials:', e);
     }
-    // Default Super Admin password
     return {
       'tropicalgardenresto@tropicalgarden.com': 'tropical2026',
       'superadmin': 'tropical2026',
@@ -68,12 +101,10 @@ class EmployeeServiceClass {
     const cleanKey = emailOrCode.toLowerCase().trim();
     const creds = this.getStoredCredentials();
 
-    // Check direct email match
     if (creds[cleanKey] && creds[cleanKey] === password.trim()) {
       return true;
     }
 
-    // Check match via employee code/no
     const employees = this.getStoredEmployees();
     const matchedEmp = employees.find(
       (e) =>
@@ -88,7 +119,6 @@ class EmployeeServiceClass {
       if (creds[empEmail] && creds[empEmail] === password.trim()) {
         return true;
       }
-      // If default demo password
       if (password.trim() === 'tropical2026' || password.trim() === '123456') {
         return true;
       }
@@ -101,21 +131,34 @@ class EmployeeServiceClass {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(employees));
     } catch (e) {
-      console.error('[EmployeeService] Error saving employees to localStorage:', e);
+      console.error('[EmployeeService] Error saving to localStorage:', e);
     }
   }
 
   /**
-   * Get all employees with optional filtering
+   * Fetch all employees from Backend Prisma API, with LocalStorage fallback
    */
-  public async getEmployees(params?: EmployeeFilterParams): Promise<Employee[]> {
-    await delay(150);
-    let list = this.getStoredEmployees();
+  public async getEmployees(params: EmployeeFilterParams = {}): Promise<Employee[]> {
+    let list: Employee[] = [];
 
-    if (!params) return list;
+    try {
+      const response = await fetch(`${HR_API_BASE}/employees`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      const resData = await response.json();
+      if (resData.success && Array.isArray(resData.data) && resData.data.length > 0) {
+        list = resData.data.map((item: any) => this.mapPrismaToFrontend(item));
+        this.saveToStorage(list);
+      } else {
+        list = this.getStoredEmployees();
+      }
+    } catch (err) {
+      list = this.getStoredEmployees();
+    }
 
-    if (params.searchQuery && params.searchQuery.trim() !== '') {
-      const q = params.searchQuery.trim().toLowerCase();
+    // Apply client filters if requested
+    if (params.search && params.search.trim() !== '') {
+      const q = params.search.toLowerCase().trim();
       list = list.filter(
         (emp) =>
           emp.fullName.toLowerCase().includes(q) ||
@@ -147,57 +190,34 @@ class EmployeeServiceClass {
     return list;
   }
 
-  /**
-   * Backward-compat getAllEmployees wrapper
-   */
   public async getAllEmployees(): Promise<{ data: Employee[]; error?: string }> {
     const data = await this.getEmployees();
     return { data };
   }
 
-  /**
-   * Get employee by ID or Code
-   */
   public async getEmployeeById(idOrCode: string): Promise<Employee | null> {
-    await delay(100);
-    const list = this.getStoredEmployees();
+    const list = await this.getEmployees();
     const found = list.find((emp) => emp.id === idOrCode || emp.employeeCode === idOrCode || emp.employeeNo === idOrCode);
     return found || null;
   }
 
-  /**
-   * Get all currently active employees
-   */
   public async getActiveEmployees(): Promise<Employee[]> {
-    await delay(120);
-    const list = this.getStoredEmployees();
+    const list = await this.getEmployees();
     return list.filter((emp) => emp.isActive && emp.status === 'ACTIVE');
   }
 
-  /**
-   * Get employees by Department
-   */
   public async getEmployeesByDepartment(department: Department): Promise<Employee[]> {
-    await delay(120);
-    const list = this.getStoredEmployees();
+    const list = await this.getEmployees();
     return list.filter((emp) => emp.department === department);
   }
 
-  /**
-   * Get employees by Access Level
-   */
   public async getEmployeesByAccessLevel(accessLevel: AccessLevel): Promise<Employee[]> {
-    await delay(120);
-    const list = this.getStoredEmployees();
+    const list = await this.getEmployees();
     return list.filter((emp) => emp.accessLevel === accessLevel);
   }
 
-  /**
-   * Calculate real-time statistics
-   */
   public async getEmployeeStatistics(): Promise<EmployeeStatistics> {
-    await delay(100);
-    const list = this.getStoredEmployees();
+    const list = await this.getEmployees();
 
     const byDept: Record<Department, number> = {
       Executive: 0,
@@ -254,31 +274,31 @@ class EmployeeServiceClass {
   }
 
   /**
-   * Create a new employee
+   * Create a new employee - SAVES DIRECTLY TO PRISMA SQLITE BACKEND
    */
   public async createEmployee(
     data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'isActive'> & { isActive?: boolean; password?: string }
   ): Promise<Employee> {
-    await delay(250);
-    const list = this.getStoredEmployees();
+    let createdFromBackend: Employee | null = null;
 
-    // Check duplicate code or email
-    const duplicateCode = list.some((e) => e.employeeCode.toLowerCase() === data.employeeCode.toLowerCase());
-    if (duplicateCode) {
-      throw new Error(`Kode Karyawan "${data.employeeCode}" sudah terdaftar.`);
-    }
-
-    const duplicateEmail = list.some((e) => e.email.toLowerCase() === data.email.toLowerCase());
-    if (duplicateEmail) {
-      throw new Error(`Email "${data.email}" sudah digunakan.`);
+    try {
+      const response = await fetch(`${HR_API_BASE}/employees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const resData = await response.json();
+      if (resData.success && resData.data) {
+        createdFromBackend = this.mapPrismaToFrontend(resData.data);
+      }
+    } catch (err) {
+      console.warn('[EmployeeService] Backend creation offline, falling back to local memory:', err);
     }
 
     const now = new Date().toISOString();
-    const newId = `emp-${String(list.length + 1).padStart(2, '0')}-${Date.now().toString(36).slice(-4)}`;
-
-    const newEmployee: Employee = {
+    const newEmployee: Employee = createdFromBackend || {
       ...data,
-      id: newId,
+      id: `emp-${Date.now().toString(36)}`,
       name: data.fullName,
       employeeNo: data.employeeCode,
       isActive: data.isActive !== undefined ? data.isActive : data.status === 'ACTIVE',
@@ -288,10 +308,10 @@ class EmployeeServiceClass {
       division: data.department,
     };
 
-    const updatedList = [newEmployee, ...list];
+    const currentList = this.getStoredEmployees();
+    const updatedList = [newEmployee, ...currentList.filter((e) => e.employeeCode !== newEmployee.employeeCode)];
     this.saveToStorage(updatedList);
 
-    // Register password if provided
     if (data.password) {
       this.registerCredentials(newEmployee.email, data.password);
     } else {
@@ -301,9 +321,6 @@ class EmployeeServiceClass {
     return newEmployee;
   }
 
-  /**
-   * Backward-compat addEmployee wrapper
-   */
   public async addEmployee(employee: any): Promise<{ success: boolean; data?: Employee; error?: string }> {
     try {
       const created = await this.createEmployee({
@@ -332,48 +349,44 @@ class EmployeeServiceClass {
   }
 
   /**
-   * Update existing employee
+   * Update existing employee in Prisma & localStorage
    */
   public async updateEmployee(id: string, updates: Partial<Employee>): Promise<Employee> {
-    await delay(250);
+    try {
+      await fetch(`${HR_API_BASE}/employees/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+    } catch (err) {
+      console.warn('[EmployeeService] Backend update offline, updating local memory:', err);
+    }
+
     const list = this.getStoredEmployees();
     const index = list.findIndex((e) => e.id === id);
 
-    if (index === -1) {
-      throw new Error(`Karyawan dengan ID "${id}" tidak ditemukan.`);
+    if (index !== -1) {
+      const current = list[index];
+      const updated: Employee = {
+        ...current,
+        ...updates,
+        name: updates.fullName || updates.name || current.fullName,
+        fullName: updates.fullName || updates.name || current.fullName,
+        employeeNo: updates.employeeCode || updates.employeeNo || current.employeeCode,
+        employeeCode: updates.employeeCode || updates.employeeNo || current.employeeCode,
+        isActive: updates.status ? updates.status === 'ACTIVE' : updates.isActive !== undefined ? updates.isActive : current.isActive,
+        updatedAt: new Date().toISOString(),
+      };
+      list[index] = updated;
+      this.saveToStorage(list);
+      return updated;
     }
 
-    const current = list[index];
-
-    // If changing code/email, check unique
-    if (updates.employeeCode && updates.employeeCode !== current.employeeCode) {
-      const exists = list.some((e) => e.id !== id && e.employeeCode.toLowerCase() === updates.employeeCode!.toLowerCase());
-      if (exists) throw new Error(`Kode Karyawan "${updates.employeeCode}" sudah digunakan.`);
-    }
-
-    if (updates.email && updates.email !== current.email) {
-      const exists = list.some((e) => e.id !== id && e.email.toLowerCase() === updates.email!.toLowerCase());
-      if (exists) throw new Error(`Email "${updates.email}" sudah digunakan.`);
-    }
-
-    const updated: Employee = {
-      ...current,
-      ...updates,
-      name: updates.fullName || updates.name || current.fullName,
-      fullName: updates.fullName || updates.name || current.fullName,
-      employeeNo: updates.employeeCode || updates.employeeNo || current.employeeCode,
-      employeeCode: updates.employeeCode || updates.employeeNo || current.employeeCode,
-      isActive: updates.status ? updates.status === 'ACTIVE' : updates.isActive !== undefined ? updates.isActive : current.isActive,
-      updatedAt: new Date().toISOString(),
-    };
-
-    list[index] = updated;
-    this.saveToStorage(list);
-    return updated;
+    throw new Error(`Karyawan dengan ID "${id}" tidak ditemukan.`);
   }
 
   /**
-   * Deactivate an employee (sets status to INACTIVE and isActive to false)
+   * Deactivate an employee
    */
   public async deactivateEmployee(id: string): Promise<Employee> {
     return this.updateEmployee(id, {
@@ -383,7 +396,7 @@ class EmployeeServiceClass {
   }
 
   /**
-   * Activate an employee (sets status to ACTIVE and isActive to true)
+   * Activate an employee
    */
   public async activateEmployee(id: string): Promise<Employee> {
     return this.updateEmployee(id, {
@@ -393,87 +406,24 @@ class EmployeeServiceClass {
   }
 
   /**
-   * Toggle active status
+   * Delete employee in Prisma and LocalStorage
    */
-  public async toggleEmployeeStatus(id: string): Promise<Employee> {
-    const emp = await this.getEmployeeById(id);
-    if (!emp) throw new Error('Karyawan tidak ditemukan');
-    if (emp.isActive && emp.status === 'ACTIVE') {
-      return this.deactivateEmployee(id);
-    } else {
-      return this.activateEmployee(id);
-    }
-  }
-
-  /**
-   * Reset database back to original 24 personnel
-   */
-  public async resetToInitial(): Promise<Employee[]> {
-    await delay(200);
-    this.saveToStorage(INITIAL_EMPLOYEES);
-    return INITIAL_EMPLOYEES;
-  }
-
-  /**
-   * Delete an employee (manager only action, with protection for Owner & GM)
-   */
-  public async deleteEmployee(id: string): Promise<{ success: boolean; error?: string }> {
-    await delay(200);
-    const list = this.getStoredEmployees();
-    const target = list.find((e) => e.id === id);
-
-    if (!target) return { success: false, error: 'Karyawan tidak ditemukan.' };
-
-    if (target.accessLevel === 'OWNER' || target.employeeCode === 'TG-OWN-001') {
-      return { success: false, error: 'Akun Owner tidak dapat dihapus.' };
-    }
-
-    if (target.employeeCode === 'TG-MGR-001') {
-      return { success: false, error: 'Akun General Manager tidak dapat dihapus.' };
-    }
-
-    const filtered = list.filter((e) => e.id !== id);
-    this.saveToStorage(filtered);
-    return { success: true };
-  }
-
-  /**
-   * Helper for self service view: get profile of current user
-   */
-  public async getCurrentEmployeeProfile(empIdentifier?: string): Promise<{ data: Employee | null; error?: string }> {
-    await delay(100);
-    const list = this.getStoredEmployees();
-    if (empIdentifier) {
-      const q = empIdentifier.toLowerCase().trim();
-      const found = list.find(
-        (e) =>
-          e.id === empIdentifier ||
-          e.employeeCode.toLowerCase() === q ||
-          e.email.toLowerCase() === q ||
-          e.fullName.toLowerCase() === q
-      );
-      if (found) return { data: found };
-    }
-    return { data: list[0] || null };
-  }
-
-  /**
-   * Helper for self service view: update self profile
-   */
-  public async updateSelfProfile(
-    empId: string,
-    updates: Partial<Employee>
-  ): Promise<{ data?: Employee; error?: string }> {
+  public async deleteEmployee(id: string): Promise<boolean> {
     try {
-      const updated = await this.updateEmployee(empId, updates);
-      return { data: updated };
-    } catch (err: any) {
-      return { error: err.message || 'Gagal memperbarui profil' };
+      await fetch(`${HR_API_BASE}/employees/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.warn('[EmployeeService] Backend delete offline:', err);
     }
+
+    const list = this.getStoredEmployees();
+    const updated = list.filter((e) => e.id !== id);
+    this.saveToStorage(updated);
+    return true;
   }
 }
 
-export type EmployeeData = Employee;
-
 export const employeeService = new EmployeeServiceClass();
-export const EmployeeService = employeeService; // alias
+export const EmployeeService = employeeService;
+export type EmployeeData = Employee;
