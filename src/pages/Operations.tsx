@@ -56,6 +56,7 @@ export default function Operations() {
 
   const renderSubmoduleContent = () => {
     switch (activeSubParam) {
+      case 'checklists':
       case 'checklist':
         return (
           <div className="space-y-6">
@@ -64,6 +65,7 @@ export default function Operations() {
         );
 
       case 'shift':
+      case 'handover':
         return (
           <div className="space-y-6">
             <ShiftHandoverHub currentUser={currentUser} />
@@ -101,6 +103,7 @@ export default function Operations() {
           </div>
         );
 
+      case 'procurement':
       case 'purchasing':
         return (
           <div className="space-y-6">

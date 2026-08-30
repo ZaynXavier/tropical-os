@@ -6,17 +6,13 @@ import { AppLayout } from '../components/layout/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { permissionService } from '../services/permissionService';
 
-// Pages
+// 6 Core Pages
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import HR from '../pages/HR';
-import CRM from '../pages/CRM';
 import Operations from '../pages/Operations';
 import Finance from '../pages/Finance';
-import Development from '../pages/Development';
-import ContentCreator from '../pages/ContentCreator';
-import DigitalMarketing from '../pages/DigitalMarketing';
-import Reports from '../pages/Reports';
+import CRM from '../pages/CRM';
 import Settings from '../pages/Settings';
 import PermissionDeniedPage from '../pages/PermissionDenied';
 import NotFound from '../pages/NotFound';
@@ -58,7 +54,7 @@ export const AppRouter: React.FC = () => {
       >
         <Route index element={<HomeRedirect />} />
 
-        {/* 1. Dashboard */}
+        {/* 1. Executive Dashboard */}
         <Route
           path="dashboard"
           element={<DashboardRouteWrapper />}
@@ -74,17 +70,7 @@ export const AppRouter: React.FC = () => {
           }
         />
 
-        {/* 3. Tropical CRM */}
-        <Route
-          path="crm"
-          element={
-            <RoleGuard moduleId="crm">
-              <CRM />
-            </RoleGuard>
-          }
-        />
-
-        {/* 4. Operations */}
+        {/* 3. Kitchen & Operations */}
         <Route
           path="operations"
           element={
@@ -94,7 +80,7 @@ export const AppRouter: React.FC = () => {
           }
         />
 
-        {/* 5. Finance */}
+        {/* 4. Sales & Finance POS */}
         <Route
           path="finance"
           element={
@@ -103,48 +89,19 @@ export const AppRouter: React.FC = () => {
             </RoleGuard>
           }
         />
+        <Route path="sales" element={<Navigate to="/finance" replace />} />
 
-        {/* 6. Development */}
+        {/* 5. Tropical CRM & Marketing */}
         <Route
-          path="development"
+          path="crm"
           element={
-            <RoleGuard moduleId="development">
-              <Development />
+            <RoleGuard moduleId="crm">
+              <CRM />
             </RoleGuard>
           }
         />
 
-        {/* 7. Content Creator */}
-        <Route
-          path="content"
-          element={
-            <RoleGuard moduleId="content">
-              <ContentCreator />
-            </RoleGuard>
-          }
-        />
-
-        {/* 8. Digital Marketing */}
-        <Route
-          path="marketing"
-          element={
-            <RoleGuard moduleId="marketing">
-              <DigitalMarketing />
-            </RoleGuard>
-          }
-        />
-
-        {/* 9. Reports (MBR) */}
-        <Route
-          path="reports"
-          element={
-            <RoleGuard moduleId="reports">
-              <Reports />
-            </RoleGuard>
-          }
-        />
-
-        {/* 11. Settings */}
+        {/* 6. Settings & System */}
         <Route
           path="settings"
           element={
@@ -153,6 +110,13 @@ export const AppRouter: React.FC = () => {
             </RoleGuard>
           }
         />
+
+        {/* Seamless Legacy Redirects to 6 Core Pillars */}
+        <Route path="hpp" element={<Navigate to="/operations?sub=recipes" replace />} />
+        <Route path="development" element={<Navigate to="/hr?sub=sop" replace />} />
+        <Route path="content" element={<Navigate to="/crm?sub=content" replace />} />
+        <Route path="marketing" element={<Navigate to="/crm?sub=content" replace />} />
+        <Route path="reports" element={<Navigate to="/dashboard" replace />} />
 
         {/* Permission Denied Page */}
         <Route path="permission-denied" element={<PermissionDeniedPage />} />

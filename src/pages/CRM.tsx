@@ -15,6 +15,8 @@ import { CrmPipeline } from '../components/crm/CrmPipeline';
 import { CrmWhatsApp } from '../components/crm/CrmWhatsApp';
 import { CrmWhatsAppBlast } from '../components/crm/CrmWhatsAppBlast';
 import { CrmCalendar } from '../components/crm/CrmCalendar';
+import { ContentCalendarView } from '../components/content/ContentCalendarView';
+import { InfluencerCampaignView } from '../components/content/InfluencerCampaignView';
 import {
   MOCK_CUSTOMERS,
   MOCK_LEADS,
@@ -177,6 +179,21 @@ export default function CRM() {
             onUpdateStage={handleUpdateOpportunityStage}
             onOpenAddDeal={() => setSearchParams({ sub: 'leads' })}
           />
+        );
+
+      case 'content':
+      case 'marketing':
+        return (
+          <div className="space-y-6">
+            <ContentCalendarView />
+          </div>
+        );
+
+      case 'influencer':
+        return (
+          <div className="space-y-6">
+            <InfluencerCampaignView />
+          </div>
         );
 
       case 'calendar':

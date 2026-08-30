@@ -54,6 +54,7 @@ export default function Finance() {
 
   const renderContent = () => {
     switch (activeSubParam) {
+      case 'sales':
       case 'revenue':
         return (
           <SalesDashboardView
@@ -65,53 +66,11 @@ export default function Finance() {
           />
         );
 
+      case 'closing':
       case 'cashier':
         return (
           <div className="space-y-6">
             <CashierRevenueReport user={legacyUser} />
-          </div>
-        );
-
-      case 'hpp':
-        return (
-          <div className="space-y-6">
-            {/* HPP Sub-Navigation Switcher */}
-            <div className="bg-[#151B2B] p-1.5 rounded-xl border border-white/10 flex items-center gap-2 max-w-fit">
-              <button
-                onClick={() => setHppActiveTab('matrix')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  hppActiveTab === 'matrix'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                Menu Engineering &amp; Food Cost Matrix
-              </button>
-              <button
-                onClick={() => setHppActiveTab('calculator')}
-                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                  hppActiveTab === 'calculator'
-                    ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Calculator className="w-4 h-4" />
-                Kalkulator Resep &amp; Simulasi Margin HPP
-              </button>
-            </div>
-
-            {hppActiveTab === 'matrix' ? (
-              <HppDashboardView
-                currentUser={{
-                  id: currentEmployee.id,
-                  name: currentEmployee.name,
-                  role: currentUser?.role || 'MANAGER',
-                }}
-              />
-            ) : (
-              <HppCalculatorView user={legacyUser} />
-            )}
           </div>
         );
 
@@ -122,6 +81,7 @@ export default function Finance() {
           </div>
         );
 
+      case 'statements':
       case 'reports':
       case 'profitability':
       default:
