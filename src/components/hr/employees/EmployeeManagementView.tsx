@@ -243,7 +243,7 @@ export const EmployeeManagementView: React.FC = () => {
               Direktori &amp; Manajemen Karyawan
             </h1>
             <p className="text-xs text-purple-200/70 max-w-2xl mt-0.5">
-              Pusat data 24 karyawan Tropical Garden Resto dengan pemetaan jabatan pokok, tanggung jawab khusus, dan garis komando hierarki.
+              Pusat data {employees.length} personil Tropical Garden Resto dengan pemetaan jabatan pokok, tanggung jawab khusus, dan kredensial login akun.
             </p>
           </div>
         </div>

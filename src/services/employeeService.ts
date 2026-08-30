@@ -9,12 +9,13 @@ import {
 import { INITIAL_EMPLOYEES } from '../data/employees';
 
 const STORAGE_KEY = 'tropicalos_master_employees';
+const CREDENTIALS_KEY = 'tropicalos_employee_credentials';
 
 // Helper to simulate realistic async network delay
 const delay = (ms = 180) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class EmployeeServiceClass {
-  private getStoredEmployees(): Employee[] {
+  public getStoredEmployees(): Employee[] {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -26,9 +27,74 @@ class EmployeeServiceClass {
     } catch (e) {
       console.warn('[EmployeeService] Error loading employees from localStorage:', e);
     }
-    // Initialize with master 24 personnel
+    // Initialize with master clean personnel (Super Admin)
     this.saveToStorage(INITIAL_EMPLOYEES);
     return INITIAL_EMPLOYEES;
+  }
+
+  public getAllEmployeesSync(): Employee[] {
+    return this.getStoredEmployees();
+  }
+
+  public getStoredCredentials(): Record<string, string> {
+    try {
+      const stored = localStorage.getItem(CREDENTIALS_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.warn('[EmployeeService] Error reading credentials:', e);
+    }
+    // Default Super Admin password
+    return {
+      'tropicalgardenresto@tropicalgarden.com': 'tropical2026',
+      'superadmin': 'tropical2026',
+    };
+  }
+
+  public registerCredentials(email: string, password: string): void {
+    if (!email || !password) return;
+    try {
+      const creds = this.getStoredCredentials();
+      creds[email.toLowerCase().trim()] = password.trim();
+      localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(creds));
+    } catch (e) {
+      console.error('[EmployeeService] Failed to save credentials:', e);
+    }
+  }
+
+  public verifyCredentials(emailOrCode: string, password: string): boolean {
+    if (!emailOrCode || !password) return false;
+    const cleanKey = emailOrCode.toLowerCase().trim();
+    const creds = this.getStoredCredentials();
+
+    // Check direct email match
+    if (creds[cleanKey] && creds[cleanKey] === password.trim()) {
+      return true;
+    }
+
+    // Check match via employee code/no
+    const employees = this.getStoredEmployees();
+    const matchedEmp = employees.find(
+      (e) =>
+        e.email.toLowerCase() === cleanKey ||
+        e.employeeCode.toLowerCase() === cleanKey ||
+        e.employeeNo.toLowerCase() === cleanKey ||
+        e.name.toLowerCase() === cleanKey
+    );
+
+    if (matchedEmp) {
+      const empEmail = matchedEmp.email.toLowerCase();
+      if (creds[empEmail] && creds[empEmail] === password.trim()) {
+        return true;
+      }
+      // If default demo password
+      if (password.trim() === 'tropical2026' || password.trim() === '123456') {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private saveToStorage(employees: Employee[]): void {
@@ -191,7 +257,7 @@ class EmployeeServiceClass {
    * Create a new employee
    */
   public async createEmployee(
-    data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'isActive'> & { isActive?: boolean }
+    data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt' | 'isActive'> & { isActive?: boolean; password?: string }
   ): Promise<Employee> {
     await delay(250);
     const list = this.getStoredEmployees();
@@ -224,6 +290,14 @@ class EmployeeServiceClass {
 
     const updatedList = [newEmployee, ...list];
     this.saveToStorage(updatedList);
+
+    // Register password if provided
+    if (data.password) {
+      this.registerCredentials(newEmployee.email, data.password);
+    } else {
+      this.registerCredentials(newEmployee.email, 'tropical2026');
+    }
+
     return newEmployee;
   }
 

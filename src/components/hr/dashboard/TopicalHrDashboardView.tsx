@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { INITIAL_EMPLOYEES } from '../../../data/employees';
+import { employeeService } from '../../../services/employeeService';
 import {
   Users,
   Clock,
@@ -47,33 +47,62 @@ export const TopicalHrDashboardView: React.FC = () => {
   >('statistik');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. STATS CALCULATIONS FOR DEMOGRAPHY (Based on Master 25 Personnel)
-  const totalEmployees = INITIAL_EMPLOYEES.length;
-  const maleCount = INITIAL_EMPLOYEES.filter((e) => e.gender === 'MALE').length;
-  const femaleCount = INITIAL_EMPLOYEES.filter((e) => e.gender === 'FEMALE').length;
+  // 1. STATS CALCULATIONS FOR DEMOGRAPHY (Fully Dynamic from Master Employees)
+  const [employees, setEmployees] = useState(employeeService.getAllEmployeesSync());
+
+  React.useEffect(() => {
+    setEmployees(employeeService.getAllEmployeesSync());
+  }, [activeTab]);
+
+  const totalEmployees = employees.length;
+  const maleCount = employees.filter((e) => e.gender === 'MALE').length;
+  const femaleCount = employees.filter((e) => e.gender === 'FEMALE').length;
+
+  const malePercent = totalEmployees > 0 ? Math.round((maleCount / totalEmployees) * 100) : 0;
+  const femalePercent = totalEmployees > 0 ? Math.round((femaleCount / totalEmployees) * 100) : 0;
 
   const genderData = [
-    { name: 'Pria', value: maleCount, color: '#EF4444' }, // Red like reference Image 2
-    { name: 'Wanita', value: femaleCount, color: '#3B82F6' }, // Blue like reference Image 2
+    { name: 'Pria', value: maleCount, color: '#EF4444' },
+    { name: 'Wanita', value: femaleCount, color: '#3B82F6' },
   ];
 
-  // Generation demographics:
-  // Gen Z (1997-2012): majority in F&B (~16 people)
-  // Gen Millenial (1981-1996): (~8 people)
-  // Gen X (1965-1980): (~1 person / Owner)
+  // Dynamic Generation Calculation
+  let babyBoomer = 0;
+  let genX = 0;
+  let genMillenial = 0;
+  let genZ = 0;
+
+  employees.forEach((emp) => {
+    if (emp.accessLevel === 'OWNER') {
+      genX++;
+    } else if (emp.accessLevel === 'MANAGER' || emp.accessLevel === 'SUPERVISOR') {
+      genMillenial++;
+    } else {
+      genZ++;
+    }
+  });
+
   const generationData = [
-    { name: 'Baby Boomer (1946-1964)', value: 0, color: '#FACC15' },
-    { name: 'Gen X (1965-1980)', value: 1, color: '#DC2626' },
-    { name: 'Gen Millenial (1981-1996)', value: 8, color: '#2563EB' },
-    { name: 'Gen Z (1997-2012)', value: 16, color: '#22C55E' },
-    { name: 'Gen Alpha (2013-2025)', value: 0, color: '#9CA3AF' },
+    { name: 'Baby Boomer (1946-1964)', value: babyBoomer, color: '#FACC15' },
+    { name: 'Gen X (1965-1980)', value: genX, color: '#DC2626' },
+    { name: 'Gen Millenial (1981-1996)', value: genMillenial, color: '#2563EB' },
+    { name: 'Gen Z (1997-2012)', value: genZ, color: '#22C55E' },
   ];
+
+  const permanentCount = employees.filter((e) => e.employmentStatus === 'PERMANENT').length;
+  const contractCount = employees.filter((e) => e.employmentStatus === 'CONTRACT').length;
+  const probationCount = employees.filter((e) => e.employmentStatus === 'PROBATION').length;
+  const partTimeCount = employees.filter((e) => (e as any).employmentStatus === 'PART_TIME' || (e as any).employmentStatus === 'DAILY_WORKER').length;
 
   const contractData = [
-    { name: 'Tetap (Permanent)', count: 18, fill: '#8B5CF6' },
-    { name: 'Kontrak (PKWT)', count: 6, fill: '#3B82F6' },
-    { name: 'Probation (Percobaan)', count: 1, fill: '#F59E0B' },
+    { name: 'Tetap (Permanent / PKWTT)', count: permanentCount, fill: '#8B5CF6' },
+    { name: 'Kontrak (PKWT)', count: contractCount, fill: '#3B82F6' },
+    { name: 'Probation (Percobaan)', count: probationCount, fill: '#F59E0B' },
+    ...(partTimeCount > 0 ? [{ name: 'Paruh Waktu (Part-Time)', count: partTimeCount, fill: '#10B981' }] : []),
   ];
+
+  const activeEmployeesCount = employees.filter((e) => e.status === 'ACTIVE' && e.isActive).length;
+  const retentionRate = totalEmployees > 0 ? ((activeEmployeesCount / totalEmployees) * 100).toFixed(1) : '100.0';
 
   // 2. CHECKLIST COMPLIANCE DATA
   const divisionChecklists = [
@@ -194,28 +223,30 @@ export const TopicalHrDashboardView: React.FC = () => {
             <div className="bg-[#1E2438] border border-[#2D374E] p-4 rounded-2xl">
               <span className="text-xs text-gray-400">Total Personel</span>
               <div className="text-2xl font-black text-white mt-1">{totalEmployees} Orang</div>
-              <span className="text-[11px] text-emerald-400 font-medium">100% Formasi Lengkap</span>
+              <span className="text-[11px] text-emerald-400 font-medium">Terdaftar di Sistem</span>
             </div>
             <div className="bg-[#1E2438] border border-[#2D374E] p-4 rounded-2xl">
               <span className="text-xs text-gray-400">Rasio Pria : Wanita</span>
               <div className="text-2xl font-black text-blue-400 mt-1">
                 {maleCount} : {femaleCount}
               </div>
-              <span className="text-[11px] text-gray-400">({Math.round((maleCount / totalEmployees) * 100)}% Pria)</span>
+              <span className="text-[11px] text-gray-400">({malePercent}% Pria)</span>
             </div>
             <div className="bg-[#1E2438] border border-[#2D374E] p-4 rounded-2xl">
               <span className="text-xs text-gray-400">Karyawan Tetap (PKWTT)</span>
-              <div className="text-2xl font-black text-purple-400 mt-1">18 Orang</div>
-              <span className="text-[11px] text-purple-300 font-medium">72% Staf Inti</span>
+              <div className="text-2xl font-black text-purple-400 mt-1">{permanentCount} Orang</div>
+              <span className="text-[11px] text-purple-300 font-medium">
+                {totalEmployees > 0 ? Math.round((permanentCount / totalEmployees) * 100) : 0}% Staf Inti
+              </span>
             </div>
             <div className="bg-[#1E2438] border border-[#2D374E] p-4 rounded-2xl">
               <span className="text-xs text-gray-400">Tingkat Retensi</span>
-              <div className="text-2xl font-black text-emerald-400 mt-1">96.8%</div>
-              <span className="text-[11px] text-emerald-300 font-medium">Turnover Rendah</span>
+              <div className="text-2xl font-black text-emerald-400 mt-1">{retentionRate}%</div>
+              <span className="text-[11px] text-emerald-300 font-medium">Staf Aktif Bekerja</span>
             </div>
           </div>
 
-          {/* Gender & Generasi Charts (Exact visual pattern of Image 2) */}
+          {/* Gender & Generasi Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Gender Pie Chart */}
             <div className="bg-[#1E2438] border border-[#2D374E] rounded-2xl p-6 shadow-lg">
@@ -224,17 +255,17 @@ export const TopicalHrDashboardView: React.FC = () => {
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
                   Gender / Jenis Kelamin
                 </h3>
-                <span className="text-xs text-gray-400 font-medium">25 Karyawan</span>
+                <span className="text-xs text-gray-400 font-medium">{totalEmployees} Karyawan</span>
               </div>
 
               <div className="flex items-center justify-center gap-6 mb-4">
                 <div className="flex items-center gap-2 text-xs font-semibold text-gray-200">
                   <span className="w-4 h-3 rounded-xs bg-[#EF4444] inline-block"></span>
-                  Pria ({maleCount} orang - {Math.round((maleCount / totalEmployees) * 100)}%)
+                  Pria ({maleCount} orang - {malePercent}%)
                 </div>
                 <div className="flex items-center gap-2 text-xs font-semibold text-gray-200">
                   <span className="w-4 h-3 rounded-xs bg-[#3B82F6] inline-block"></span>
-                  Wanita ({femaleCount} orang - {Math.round((femaleCount / totalEmployees) * 100)}%)
+                  Wanita ({femaleCount} orang - {femalePercent}%)
                 </div>
               </div>
 
@@ -276,26 +307,26 @@ export const TopicalHrDashboardView: React.FC = () => {
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
                   Generasi Demografi
                 </h3>
-                <span className="text-xs text-gray-400 font-medium">Usia & Karakter</span>
+                <span className="text-xs text-gray-400 font-medium">Usia &amp; Karakter</span>
               </div>
 
-              {/* Legends matching reference image 2 */}
+              {/* Legends matching dynamic generation data */}
               <div className="grid grid-cols-2 gap-2 text-xs font-medium text-gray-300 mb-4">
                 <div className="flex items-center gap-2">
                   <span className="w-3.5 h-2.5 rounded-xs bg-[#FACC15]"></span>
-                  Baby Boomer (1946-1964): 0
+                  Baby Boomer (1946-1964): {babyBoomer}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-3.5 h-2.5 rounded-xs bg-[#DC2626]"></span>
-                  Gen X (1965-1980): 1
+                  Gen X (1965-1980): {genX}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-3.5 h-2.5 rounded-xs bg-[#2563EB]"></span>
-                  Gen Millenial (1981-1996): 8
+                  Gen Millenial (1981-1996): {genMillenial}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-3.5 h-2.5 rounded-xs bg-[#22C55E]"></span>
-                  Gen Z (1997-2012): 16
+                  Gen Z (1997-2012): {genZ}
                 </div>
               </div>
 

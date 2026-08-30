@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { INITIAL_EMPLOYEES } from '../../data/employees';
+import { employeeService } from '../../services/employeeService';
 import { MASTER_DIVISION_CHECKLISTS, DivisionChecklistItem } from '../../data/divisionChecklists';
 import {
   Clock,
@@ -346,9 +346,9 @@ export const MobileStaffPortal: React.FC<MobileStaffPortalProps> = ({ onSwitchTo
                 className="text-[10px] font-bold bg-[#1A2234] text-purple-200 border border-purple-500/30 rounded-xl px-2 py-1.5 outline-none cursor-pointer max-w-[110px]"
                 title="Ganti Profil Karyawan (Semua Divisi Resto)"
               >
-                {INITIAL_EMPLOYEES.map((emp) => (
+                {employeeService.getAllEmployeesSync().map((emp) => (
                   <option key={emp.id} value={emp.id}>
-                    {emp.name} ({emp.department})
+                    {emp.name || emp.fullName} ({emp.department})
                   </option>
                 ))}
               </select>

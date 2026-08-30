@@ -82,9 +82,19 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ON_LEAVE'>('ACTIVE');
+  const [password, setPassword] = useState('tropical2026');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleGeneratePassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#";
+    let pwd = "";
+    for (let i = 0; i < 8; i++) {
+      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPassword(pwd);
+  };
 
   // Populate data when editing or opening
   useEffect(() => {
@@ -107,6 +117,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setEmergencyPhone(initialEmployee.emergencyContact?.phone || '');
       setNotes(initialEmployee.notes || '');
       setStatus(initialEmployee.status || (initialEmployee.isActive ? 'ACTIVE' : 'INACTIVE'));
+      setPassword(''); // keep blank unless resetting
     } else {
       // Defaults for create
       setFullName('');
@@ -127,6 +138,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
       setEmergencyPhone('');
       setNotes('');
       setStatus('ACTIVE');
+      setPassword('tropical2026');
     }
     setError(null);
   }, [initialEmployee, isOpen, allEmployees.length]);
@@ -185,6 +197,7 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
         managerId: managerId || null,
         status,
         isActive: status === 'ACTIVE',
+        password: password ? password.trim() : undefined,
         notes: notes.trim(),
         emergencyContact: emergencyName
           ? {
@@ -355,6 +368,32 @@ export const EmployeeFormModal: React.FC<EmployeeFormModalProps> = ({
                   <option value="INACTIVE">Non-Aktif (Keluar / Non-Aktif)</option>
                   <option value="ON_LEAVE">Sedang Cuti / Izin Panjang</option>
                 </select>
+              </div>
+
+              {/* Password / PIN Input Field */}
+              <div className="sm:col-span-2 bg-purple-950/30 border border-purple-500/30 rounded-xl p-3.5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-purple-200">
+                    Kata Sandi (Password Akun Login) {isEditing ? '(Kosongkan jika tidak ingin diubah)' : '*'}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGeneratePassword}
+                    className="text-[11px] text-purple-400 hover:text-purple-300 font-bold underline cursor-pointer"
+                  >
+                    Acak Password
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder={isEditing ? 'Tetap gunakan kata sandi lama' : 'Contoh: tropical2026 atau buat kata sandi baru'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#141029] border border-purple-500/40 rounded-xl text-xs font-mono text-purple-200 placeholder-gray-500 focus:outline-none focus:border-purple-400"
+                />
+                <p className="text-[10px] text-purple-300/70 mt-1">
+                  Kata sandi ini diberikan kepada staf agar dapat login ke TropicalOS Mobile Portal dan Desktop.
+                </p>
               </div>
             </div>
           </div>
