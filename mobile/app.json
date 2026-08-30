@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "TropicalOS Staff",
+    "slug": "tropical-os-staff",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0F19"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "TropicalOS memerlukan akses lokasi untuk memvalidasi radius presensi di area restoran.",
+        "NSCameraUsageDescription": "TropicalOS memerlukan akses kamera untuk verifikasi selfie saat clock-in presensi."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0F19"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA"
+      ],
+      "package": "com.tropical.staff"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

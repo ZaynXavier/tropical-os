@@ -35,26 +35,4 @@ export const DEFAULT_SUPER_ADMIN: Employee = {
   division: 'Executive',
 };
 
-const BASE_INITIAL_EMPLOYEES: Employee[] = [DEFAULT_SUPER_ADMIN];
-
-/**
- * Dynamic INITIAL_EMPLOYEES Proxy
- * Reads live updated employees from localStorage ('tropicalos_master_employees')
- * Seamlessly integrates dynamic HR additions across all legacy & new modules.
- */
-export const INITIAL_EMPLOYEES: Employee[] = new Proxy(BASE_INITIAL_EMPLOYEES, {
-  get(target, prop, receiver) {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = localStorage.getItem('tropicalos_master_employees');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return Reflect.get(parsed, prop, receiver);
-          }
-        }
-      }
-    } catch (_) {}
-    return Reflect.get(target, prop, receiver);
-  },
-});
+export const INITIAL_EMPLOYEES: Employee[] = [DEFAULT_SUPER_ADMIN];

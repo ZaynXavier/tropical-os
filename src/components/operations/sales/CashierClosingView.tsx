@@ -22,6 +22,7 @@ import {
 import { salesService } from '../../../services/salesService';
 import { CashierDailyClosing, SalesPeriodFilter } from '../../../types/sales';
 import { CashierClosingModal } from './CashierClosingModal';
+import { CashierClosingDetailModal } from './CashierClosingDetailModal';
 
 interface CashierClosingViewProps {
   canVerify?: boolean;
@@ -33,6 +34,7 @@ export const CashierClosingView: React.FC<CashierClosingViewProps> = ({
   const [period, setPeriod] = useState<SalesPeriodFilter>('this_month');
   const [closings, setClosings] = useState<CashierDailyClosing[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedClosing, setSelectedClosing] = useState<CashierDailyClosing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -213,17 +215,26 @@ export const CashierClosingView: React.FC<CashierClosingViewProps> = ({
                       </td>
 
                       <td className="py-3 px-4 text-center">
-                        {!isVerified && canVerify ? (
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => handleVerify(c.id)}
-                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 transition-all cursor-pointer"
+                            onClick={() => setSelectedClosing(c)}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border border-purple-500/30 transition-all cursor-pointer"
                           >
-                            Verifikasi
+                            Pecahan Uang
                           </button>
-                        ) : (
-                          <span className="text-[11px] text-slate-500 italic">Telah Diverifikasi</span>
-                        )}
+                          {!isVerified && canVerify ? (
+                            <button
+                              type="button"
+                              onClick={() => handleVerify(c.id)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/30 border border-emerald-500/30 transition-all cursor-pointer"
+                            >
+                              Verifikasi
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 italic">Verified</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -234,11 +245,21 @@ export const CashierClosingView: React.FC<CashierClosingViewProps> = ({
         </div>
       )}
 
-      {/* Cashier Closing Modal */}
+      {/* Cashier Closing Input Modal */}
       {isModalOpen && (
         <CashierClosingModal
           onClose={() => setIsModalOpen(false)}
           onSuccess={loadClosings}
+        />
+      )}
+
+      {/* Cashier Closing Detail Breakdown Modal */}
+      {selectedClosing && (
+        <CashierClosingDetailModal
+          closing={selectedClosing}
+          onClose={() => setSelectedClosing(null)}
+          onVerify={handleVerify}
+          canVerify={canVerify}
         />
       )}
     </div>

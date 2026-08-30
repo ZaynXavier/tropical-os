@@ -241,10 +241,26 @@ export interface CashierDailyClosing {
   verifiedBy?: string;
   verifiedByName?: string;
   verifiedAt?: string;
-  rejectionReason?: string;
-  auditTrail?: SalesAuditTrailRecord[];
+  cashBreakdown?: CashDenominationBreakdown;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CashDenominationBreakdown {
+  // Banknotes (Uang Kertas)
+  b100k: number; // Rp 100.000
+  b50k: number;  // Rp 50.000
+  b20k: number;  // Rp 20.000
+  b10k: number;  // Rp 10.000
+  b5k: number;   // Rp 5.000
+  b2k: number;   // Rp 2.000
+  b1k: number;   // Rp 1.000 (Kertas)
+  
+  // Coins (Uang Logam)
+  c1k: number;   // Rp 1.000 (Koin)
+  c500: number;  // Rp 500
+  c200: number;  // Rp 200
+  c100: number;  // Rp 100
 }
 
 export interface TheoreticalIngredientContribution {

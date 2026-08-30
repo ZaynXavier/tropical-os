@@ -1,0 +1,282 @@
+// TropicalOS Prisma Schema
+// Database Engine for Restaurant Management, POS, HR, Operations, and CRM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite" // Can be switched to postgresql
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------
+// 1. AUTH & USERS
+// --------------------------------------------------------
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  role         String    // OWNER, MANAGER, SUPERVISOR, STAFF
+  employeeId   String?   @unique
+  employee     Employee? @relation(fields: [employeeId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// --------------------------------------------------------
+// 2. TROPICAL HR (Employees, Attendance, Shifts, Payroll)
+// --------------------------------------------------------
+model Employee {
+  id                         String           @id @default(cuid())
+  employeeCode               String           @unique
+  fullName                   String
+  email                      String           @unique
+  phone                      String
+  gender                     String           // MALE, FEMALE
+  employmentStatus           String           // PERMANENT, CONTRACT, PROBATION, PART_TIME
+  joinDate                   DateTime
+  department                 String           // Kitchen, Bar, Service, Management, etc.
+  primaryPosition            String           // Executive Chef, Barista, Waiter, Cashier, etc.
+  accessLevel                String           // OWNER, MANAGER, SUPERVISOR, STAFF
+  additionalResponsibilities String?          // JSON array or comma separated
+  supervisorId               String?
+  managerId                  String?
+  status                     String           @default("ACTIVE") // ACTIVE, INACTIVE, ON_LEAVE
+  baseSalary                 Float            @default(0)
+  dailyAllowance             Float            @default(0)
+  notes                      String?
+  
+  user                       User?
+  attendances                Attendance[]
+  shiftAssignments           ShiftAssignment[]
+  payrollRecords             PayrollRecord[]
+  salaryAdvances             SalaryAdvance[]
+  
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
+}
+
+model Attendance {
+  id                     String    @id @default(cuid())
+  employeeId             String
+  employee               Employee  @relation(fields: [employeeId], references: [id])
+  date                   String    // YYYY-MM-DD
+  checkIn                String?   // HH:mm:ss
+  checkOut               String?   // HH:mm:ss
+  durationHours          Float     @default(0)
+  status                 String    // PRESENT, LATE, ABSENT, LEAVE, OFF
+  lateMinutes            Int       @default(0)
+  lateDeduction          Float     @default(0)
+  locationStatus         String    // VALID, OUTSIDE_AREA, DENIED
+  latitude               Float?
+  longitude              Float?
+  distanceMeters         Float?
+  faceVerificationStatus String    @default("SKIPPED") // VERIFIED, FAILED, SKIPPED
+  notes                  String?
+  
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+}
+
+model ShiftAssignment {
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  date       String   // YYYY-MM-DD
+  shiftName  String   // Pagi, Middle, Closing, Full
+  startTime  String   // 08:00
+  endTime    String   // 16:00
+  status     String   @default("SCHEDULED") // SCHEDULED, COMPLETED, SWAPPED, ABSENT
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model PayrollPeriod {
+  id          String          @id @default(cuid())
+  periodId    String          @unique // e.g. period-2026-08
+  periodName  String          // Agustus 2026
+  startDate   String
+  endDate     String
+  status      String          @default("DRAFT") // DRAFT, CALCULATED, APPROVED, LOCKED, PAID
+  totalGross  Float           @default(0)
+  totalNet    Float           @default(0)
+  records     PayrollRecord[]
+  
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model PayrollRecord {
+  id             String        @id @default(cuid())
+  periodId       String
+  payrollPeriod  PayrollPeriod @relation(fields: [periodId], references: [id])
+  employeeId     String
+  employee       Employee      @relation(fields: [employeeId], references: [id])
+  baseSalary     Float         @default(0)
+  positionAllowance Float      @default(0)
+  attendanceCount Int          @default(0)
+  dailyAllowance Float         @default(0)
+  overtimeHours  Float         @default(0)
+  overtimePay    Float         @default(0)
+  lateDeduction  Float         @default(0)
+  advanceDeduction Float       @default(0) // Kasbon
+  kpiBonus       Float         @default(0)
+  grossTotal     Float         @default(0)
+  netTotal       Float         @default(0)
+  paymentStatus  String        @default("PENDING") // PENDING, PAID
+  
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model SalaryAdvance {
+  id             String    @id @default(cuid())
+  employeeId     String
+  employee       Employee  @relation(fields: [employeeId], references: [id])
+  amount         Float
+  requestDate    DateTime  @default(now())
+  reason         String
+  status         String    @default("PENDING") // PENDING, APPROVED, REJECTED, DEDUCTED
+  approvedBy     String?
+  repaymentPeriod String?  // e.g. period-2026-08
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+// --------------------------------------------------------
+// 3. SALES & POS RESTO
+// --------------------------------------------------------
+model MenuCategory {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  icon      String?
+  items     MenuItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model MenuItem {
+  id          String            @id @default(cuid())
+  categoryId  String
+  category    MenuCategory      @relation(fields: [categoryId], references: [id])
+  name        String
+  price       Float
+  costPrice   Float             @default(0) // HPP
+  imageUrl    String?
+  isAvailable Boolean           @default(true)
+  salesItems  TransactionItem[]
+  
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model SalesTransaction {
+  id             String            @id @default(cuid())
+  invoiceNumber  String            @unique
+  orderType      String            // DINE_IN, TAKEAWAY, DELIVERY
+  tableNumber    String?
+  customerName   String?
+  totalAmount    Float
+  taxAmount      Float             @default(0)
+  serviceAmount  Float             @default(0)
+  finalAmount    Float
+  paymentMethod  String            // CASH, QRIS, DEBIT, CREDIT
+  paymentStatus  String            // PAID, VOID, REFUNDED
+  cashierName    String
+  items          TransactionItem[]
+  
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+}
+
+model TransactionItem {
+  id            String           @id @default(cuid())
+  transactionId String
+  transaction   SalesTransaction @relation(fields: [transactionId], references: [id])
+  menuItemId    String
+  menuItem      MenuItem         @relation(fields: [menuItemId], references: [id])
+  quantity      Int
+  unitPrice     Float
+  subtotal      Float
+  notes         String?
+}
+
+model CashierClosing {
+  id            String   @id @default(cuid())
+  closingDate   String   // YYYY-MM-DD
+  shiftName     String   // Pagi, Siang, Malam
+  cashierName   String
+  openingCash   Float
+  cashSales     Float
+  nonCashSales  Float
+  totalSales    Float
+  actualCash    Float
+  cashDifference Float   @default(0)
+  status        String   @default("BALANCED") // BALANCED, SHORTAGE, SURPLUS
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// --------------------------------------------------------
+// 4. CRM & WHATSAPP HUB
+// --------------------------------------------------------
+model Customer {
+  id            String        @id @default(cuid())
+  name          String
+  phone         String        @unique
+  email         String?
+  segment       String        @default("REGULAR") // VIP, REGULAR, CORPORATE
+  totalVisits   Int           @default(0)
+  totalSpend    Float         @default(0)
+  preferences   String?
+  birthday      String?
+  opportunities Opportunity[]
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Opportunity {
+  id          String    @id @default(cuid())
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  title       String    // e.g. Wedding 250 Pax
+  dealValue   Float
+  stage       String    // New Lead, Contacted, Quotation Sent, Negotiation, Closed Won, Closed Lost
+  eventDate   String?
+  paxCount    Int?
+  assignedTo  String?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model WhatsAppSession {
+  id           String            @id @default(cuid())
+  remoteJid    String            @unique
+  customerName String
+  phone        String
+  unreadCount  Int               @default(0)
+  lastMessage  String?
+  lastTime     String?
+  tags         String?           // comma separated
+  messages     WhatsAppMessage[]
+  
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model WhatsAppMessage {
+  id        String          @id @default(cuid())
+  sessionId String
+  session   WhatsAppSession @relation(fields: [sessionId], references: [id])
+  sender    String          // customer, agent, bot
+  text      String
+  status    String          @default("delivered") // sent, delivered, read
+  timestamp DateTime        @default(now())
+}

@@ -1,20 +1,29 @@
+# Dependencies
 node_modules/
-build/
+server/node_modules/
+mobile/node_modules/
+
+# Production Builds
 dist/
-coverage/
-.DS_Store
-*.log
-.env*
+build/
+server/dist/
+.expo/
+mobile/.expo/
+
+# Environment Variables
+.env
+server/.env
+mobile/.env
 !.env.example
+!server/.env.example
 
-# WhatsApp Baileys & Cache
-backend/whatsapp-gateway/auth_info_baileys/
-backend/whatsapp-gateway/.wwebjs_cache/
-backend/whatsapp-gateway/node_modules/
+# Databases & Sessions
+server/prisma/*.db
+server/prisma/*.db-journal
+server/sessions/
+sessions/
 
-# Backend Vendor & Storage
-backend/vendor/
-backend/storage/logs/*.log
-backend/storage/framework/cache/*
-backend/storage/framework/sessions/*
-backend/storage/framework/views/*
+# Logs & System
+*.log
+.DS_Store
+Thumbs.db

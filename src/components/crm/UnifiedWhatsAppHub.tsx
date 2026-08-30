@@ -22,10 +22,13 @@ import {
   Volume2,
   Calendar,
   DollarSign,
-  HeartHandshake
+  HeartHandshake,
+  Key,
+  LogOut,
+  AlertCircle,
 } from 'lucide-react';
 import { waGatewayService } from '../../services/waGatewayService';
-import { geminiService } from '../../services/geminiService';
+import { geminiService, getGeminiApiKey, setGeminiApiKey } from '../../services/geminiService';
 
 interface ChatMessage {
   id: string;
@@ -48,14 +51,95 @@ interface ChatSession {
   messages: ChatMessage[];
 }
 
+const DEFAULT_CHAT_SESSIONS: ChatSession[] = [
+  {
+    id: 'chat-01',
+    customerName: 'Bpk. Hendra Gunawan (PT Sinarmas)',
+    phone: '+62 812-3456-7890',
+    avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Hendra',
+    lastMessage: 'Baik Mbak, tolong siapkan paket wedding untuk 250 pax ya.',
+    timestamp: '10:42 WIB',
+    unreadCount: 1,
+    tags: ['Wedding Inquiry', 'VIP'],
+    status: 'ACTIVE',
+    messages: [
+      {
+        id: 'm1',
+        sender: 'customer',
+        text: 'Halo selamat pagi Tropical Garden, apakah aula utama tersedia untuk tanggal 18 Oktober?',
+        timestamp: '10:30 WIB',
+        status: 'read',
+      },
+      {
+        id: 'm2',
+        sender: 'agent',
+        text: 'Selamat pagi Bpk. Hendra! 🌿 Aula utama kami masih tersedia untuk tanggal 18 Oktober. Rencana untuk berapa pax tamu undangan Pak?',
+        timestamp: '10:35 WIB',
+        status: 'delivered',
+      },
+      {
+        id: 'm3',
+        sender: 'customer',
+        text: 'Baik Mbak, tolong siapkan paket wedding untuk 250 pax ya.',
+        timestamp: '10:42 WIB',
+        status: 'delivered',
+      },
+    ],
+  },
+  {
+    id: 'chat-02',
+    customerName: 'Ibu Maya Sari (Komunitas Kuliner)',
+    phone: '+62 813-9876-5432',
+    avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Maya',
+    lastMessage: 'Meja outdoor dekat kolam untuk 15 orang ya mas.',
+    timestamp: '09:15 WIB',
+    unreadCount: 0,
+    tags: ['Table Reservation', 'Gathering'],
+    status: 'ACTIVE',
+    messages: [
+      {
+        id: 'm1',
+        sender: 'customer',
+        text: 'Halo mas, mau booking meja untuk arisan Sabtu siang ini bisa?',
+        timestamp: '09:00 WIB',
+        status: 'read',
+      },
+      {
+        id: 'm2',
+        sender: 'agent',
+        text: 'Halo Ibu Maya! Bisa sekali, kami siapkan gazebo outdoor dekat kolam ikan ya Bu. Total berapa orang?',
+        timestamp: '09:08 WIB',
+        status: 'read',
+      },
+      {
+        id: 'm3',
+        sender: 'customer',
+        text: 'Meja outdoor dekat kolam untuk 15 orang ya mas.',
+        timestamp: '09:15 WIB',
+        status: 'read',
+      },
+    ],
+  },
+];
+
 export const UnifiedWhatsAppHub: React.FC = () => {
   const [hubTab, setHubTab] = useState<'chat' | 'qr' | 'ai' | 'blast'>('chat');
   const [isConnected, setIsConnected] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [selectedSessionId, setSelectedSessionId] = useState('chat-01');
   const [replyInput, setReplyInput] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  // Gemini API Key State
+  const [geminiKeyInput, setGeminiKeyInput] = useState(getGeminiApiKey());
+  const [geminiSavedNotice, setGeminiSavedNotice] = useState(false);
+
+  // Real WhatsApp QR Gateway State
+  const [realQrDataUrl, setRealQrDataUrl] = useState<string | null>(null);
+  const [gatewayStatus, setGatewayStatus] = useState<string>('INITIALIZING');
+  const [connectedPhone, setConnectedPhone] = useState<string | null>(null);
+  const [isRefreshingQr, setIsRefreshingQr] = useState(false);
 
   // Blast State
   const [blastTarget, setBlastTarget] = useState<'ALL' | 'VIP' | 'CORPORATE' | 'INACTIVE'>('VIP');
@@ -65,13 +149,20 @@ export const UnifiedWhatsAppHub: React.FC = () => {
   const [blastSentCount, setBlastSentCount] = useState(0);
   const [isBlasting, setIsBlasting] = useState(false);
 
-  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>(DEFAULT_CHAT_SESSIONS);
 
-  // 1. Fetch live synced chats from Baileys WhatsApp Gateway
-  const fetchLiveChats = async () => {
+  // 1. Fetch live synced chats and QR status from Backend
+  const fetchGatewayState = async () => {
     try {
-      const statusRes = await waGatewayService.getStatus();
-      setIsConnected(!!statusRes.isConnected);
+      const qrRes = await waGatewayService.getQr();
+      if (qrRes) {
+        setGatewayStatus(qrRes.status || 'INITIALIZING');
+        setIsConnected(qrRes.status === 'CONNECTED');
+        setConnectedPhone(qrRes.phone || null);
+        if (qrRes.qr) {
+          setRealQrDataUrl(qrRes.qr);
+        }
+      }
 
       const chatsRes = await waGatewayService.getChats();
       if (chatsRes.success && chatsRes.chats && chatsRes.chats.length > 0) {
@@ -100,17 +191,21 @@ export const UnifiedWhatsAppHub: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error('[UnifiedWhatsAppHub] Error fetching live chats:', err);
+      console.warn('[UnifiedWhatsAppHub] Gateway sync notice:', err);
     }
   };
 
   useEffect(() => {
-    fetchLiveChats();
-    const interval = setInterval(() => {
-      fetchLiveChats();
-    }, 4000);
+    fetchGatewayState();
+    const interval = setInterval(fetchGatewayState, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleSaveGeminiKey = () => {
+    setGeminiApiKey(geminiKeyInput);
+    setGeminiSavedNotice(true);
+    setTimeout(() => setGeminiSavedNotice(false), 3000);
+  };
 
   const handleSendMessage = async () => {
     if (!replyInput.trim()) return;
@@ -143,11 +238,7 @@ export const UnifiedWhatsAppHub: React.FC = () => {
 
     await waGatewayService.sendMessage(activeSession.phone, currentText);
     setIsSending(false);
-    await fetchLiveChats();
-  };
-
-  const handleUseAiSuggestion = (suggestion: string) => {
-    setReplyInput(suggestion);
+    await fetchGatewayState();
   };
 
   const handleGenerateAiResponse = async () => {
@@ -158,16 +249,33 @@ export const UnifiedWhatsAppHub: React.FC = () => {
       ?.find((m) => m.sender === 'customer')?.text || 'Halo, saya ingin menanyakan reservasi meja di Tropical Garden.';
 
     setAiGenerating(true);
-    const res = await geminiService.draftCrmReply(lastCustomerMsg, `Tamu: ${activeSession?.customerName || 'Pelanggan'}`);
-    setAiGenerating(false);
+    try {
+      const res = await geminiService.draftCrmReply(lastCustomerMsg, `Tamu: ${activeSession?.customerName || 'Pelanggan'}`);
+      setAiGenerating(false);
 
-    if (res.success && res.data?.reply) {
-      setReplyInput(res.data.reply);
-    } else {
+      if (res.success && res.data?.reply) {
+        setReplyInput(res.data.reply);
+      } else {
+        setReplyInput(
+          `Halo ${activeSession?.customerName || 'Kak'}, terima kasih telah menghubungi Tropical Garden Resto! Seluruh sajian spesial dan reservasi siap kami bantu koordinasikan. Ada yang bisa kami siapkan untuk kunjungan Anda? 🌿✨`
+        );
+      }
+    } catch (err: any) {
+      setAiGenerating(false);
       setReplyInput(
         `Halo ${activeSession?.customerName || 'Kak'}, terima kasih telah menghubungi Tropical Garden Resto! Seluruh sajian spesial dan reservasi siap kami bantu koordinasikan. Ada yang bisa kami siapkan untuk kunjungan Anda? 🌿✨`
       );
     }
+  };
+
+  const handleLogoutWa = async () => {
+    setIsRefreshingQr(true);
+    await waGatewayService.logout();
+    setRealQrDataUrl(null);
+    setIsConnected(false);
+    setConnectedPhone(null);
+    await fetchGatewayState();
+    setIsRefreshingQr(false);
   };
 
   const handleStartBlast = () => {
@@ -199,28 +307,40 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                 <h2 className="text-xl font-bold text-white tracking-tight">
                   Unified WhatsApp Hub (Back Office CRM)
                 </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Multi-Agent Live: Aqib & Arfani
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${
+                    isConnected
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                    }`}
+                  ></span>
+                  {isConnected
+                    ? `Live Terhubung: ${connectedPhone || '+62 812-3456-7890'}`
+                    : 'Gateway Menunggu Scan QR'}
                 </span>
               </div>
               <p className="text-xs text-gray-400">
-                Pusat komunikasi pelanggan terpadu: WhatsApp Web, Live Chat, AI Closing Assistant, dan Broadcast Blast
+                Pusat komunikasi pelanggan terpadu: WhatsApp Web, Live Chat, AI Gemini Assistant, dan Broadcast Blast
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsConnected(!isConnected)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
+              onClick={() => setHubTab('qr')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer ${
                 isConnected
                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                  : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
               }`}
             >
               <Smartphone className="w-3.5 h-3.5" />
-              {isConnected ? 'Session Active (WA Web)' : 'Disconnected (Scan QR)'}
+              {isConnected ? 'Session Active (WA Web)' : 'Scan QR WhatsApp'}
             </button>
           </div>
         </div>
@@ -229,7 +349,7 @@ export const UnifiedWhatsAppHub: React.FC = () => {
         <div className="mt-4 pt-3 border-t border-[#2D374E] flex items-center gap-2 overflow-x-auto custom-scrollbar">
           {[
             { id: 'chat', label: 'Multi-Agent Live Chat', icon: MessageSquare },
-            { id: 'ai', label: 'AI Closing Assistant', icon: Bot },
+            { id: 'ai', label: 'AI Gemini Assistant', icon: Bot },
             { id: 'blast', label: 'WhatsApp Blast & Broadcast', icon: Share2 },
             { id: 'qr', label: 'Session & QR Code Login', icon: QrCode },
           ].map((tab) => {
@@ -257,23 +377,21 @@ export const UnifiedWhatsAppHub: React.FC = () => {
       {hubTab === 'chat' && (
         <div className="bg-[#1E2438] border border-[#2D374E] rounded-2xl overflow-hidden shadow-xl grid grid-cols-1 lg:grid-cols-12 min-h-[560px]">
           {/* Left Column: Chat Inbox List */}
-          <div className="lg:col-span-4 border-r border-[#2D374E] flex flex-col bg-[#111827]/70">
-            {/* Search */}
-            <div className="p-3 border-b border-[#2D374E]">
+          <div className="lg:col-span-4 border-r border-[#2D374E] flex flex-col bg-[#111827]/60">
+            <div className="p-3.5 border-b border-[#2D374E]">
               <div className="relative">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Cari chat atau nomor pelanggan..."
+                  placeholder="Cari tamu, no. telp, atau pesan..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 bg-[#1E2438] border border-[#2D374E] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full pl-9 pr-3 py-2 bg-[#1E2438] border border-[#2D374E] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
 
-            {/* List */}
-            <div className="flex-1 overflow-y-auto divide-y divide-[#2D374E] custom-scrollbar">
+            <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-[#2D374E]/40">
               {chatSessions
                 .filter(
                   (s) =>
@@ -286,32 +404,26 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                     <div
                       key={session.id}
                       onClick={() => setSelectedSessionId(session.id)}
-                      className={`p-3.5 transition-all cursor-pointer flex items-start gap-3 ${
-                        isSelected
-                          ? 'bg-emerald-600/15 border-l-4 border-emerald-500'
-                          : 'hover:bg-[#1E2438]'
+                      className={`p-3.5 cursor-pointer transition-all flex items-start gap-3 ${
+                        isSelected ? 'bg-emerald-600/15 border-l-4 border-emerald-500' : 'hover:bg-[#1E2438]/50'
                       }`}
                     >
                       <img
                         src={session.avatar}
                         alt={session.customerName}
-                        className="w-10 h-10 rounded-full object-cover shrink-0"
+                        className="w-10 h-10 rounded-full bg-slate-700 flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white truncate">
-                            {session.customerName}
-                          </span>
+                          <h4 className="text-xs font-bold text-white truncate">{session.customerName}</h4>
                           <span className="text-[10px] text-gray-400">{session.timestamp}</span>
                         </div>
-                        <p className="text-[11px] text-gray-400 truncate mt-0.5">
-                          {session.lastMessage}
-                        </p>
-                        <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                          {session.tags.map((t) => (
+                        <p className="text-xs text-gray-300 truncate mt-0.5">{session.lastMessage}</p>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          {session.tags.map((t, idx) => (
                             <span
-                              key={t}
-                              className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#2D374E] text-gray-300"
+                              key={idx}
+                              className="text-[9px] font-semibold px-2 py-0.5 rounded bg-[#111827] text-gray-300 border border-[#2D374E]"
                             >
                               {t}
                             </span>
@@ -324,236 +436,85 @@ export const UnifiedWhatsAppHub: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column: Chat Room & AI Assist */}
-          <div className="lg:col-span-8 flex flex-col bg-[#1E2438]">
-            {/* Chat Room Header */}
-            <div className="p-3.5 border-b border-[#2D374E] flex items-center justify-between bg-[#111827]">
-              <div className="flex items-center gap-3">
-                <img
-                  src={activeSession.avatar}
-                  alt={activeSession.customerName}
-                  className="w-9 h-9 rounded-full object-cover"
-                />
-                <div>
-                  <h4 className="text-xs font-bold text-white">{activeSession.customerName}</h4>
-                  <span className="text-[11px] text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    {activeSession.phone} • Online
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleGenerateAiResponse}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 text-xs font-semibold cursor-pointer"
-                >
-                  <Bot className="w-3.5 h-3.5 text-purple-400" />
-                  {aiGenerating ? 'AI Mengetik...' : 'AI Closing Assist'}
-                </button>
-              </div>
-            </div>
-
-            {/* Chat Messages Body */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar bg-gradient-to-b from-[#111827]/40 to-[#1E2438]">
-              {activeSession.messages.map((m) => {
-                const isAgent = m.sender === 'agent' || m.sender === 'ai';
-                return (
-                  <div
-                    key={m.id}
-                    className={`flex flex-col ${isAgent ? 'items-end' : 'items-start'}`}
-                  >
-                    <div
-                      className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${
-                        isAgent
-                          ? 'bg-emerald-600 text-white rounded-tr-xs'
-                          : 'bg-[#111827] text-gray-200 border border-[#2D374E] rounded-tl-xs'
-                      }`}
-                    >
-                      <p>{m.text}</p>
-                      <div
-                        className={`text-[9px] mt-1 flex items-center justify-end gap-1 ${
-                          isAgent ? 'text-emerald-200' : 'text-gray-400'
-                        }`}
-                      >
-                        <span>{m.timestamp}</span>
-                        {isAgent && <CheckCheck className="w-3 h-3 text-emerald-200" />}
-                      </div>
+          {/* Right Column: Chat Room & Composer */}
+          <div className="lg:col-span-8 flex flex-col bg-[#151B2B]">
+            {activeSession && (
+              <>
+                {/* Chat Header */}
+                <div className="p-3.5 bg-[#111827] border-b border-[#2D374E] flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={activeSession.avatar}
+                      alt={activeSession.customerName}
+                      className="w-9 h-9 rounded-full bg-slate-700"
+                    />
+                    <div>
+                      <h4 className="text-xs font-bold text-white">{activeSession.customerName}</h4>
+                      <p className="text-[11px] text-emerald-400 font-mono">{activeSession.phone}</p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleGenerateAiResponse}
+                      disabled={aiGenerating}
+                      className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                      <span>{aiGenerating ? 'AI Menulis...' : 'Draft Balasan Gemini AI'}</span>
+                    </button>
+                  </div>
+                </div>
 
-            {/* Quick Topic-Based CRM Closing Templates Bar */}
-            <div className="px-4 py-2.5 bg-[#111827] border-t border-[#2D374E] space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5 shrink-0">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> Template Closing CRM Ramah:
-                </span>
-                <button
-                  onClick={handleGenerateAiResponse}
-                  disabled={aiGenerating}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[11px] font-bold shadow-md cursor-pointer disabled:opacity-50"
-                >
-                  <Bot className="w-3.5 h-3.5 text-purple-200" />
-                  {aiGenerating ? 'Gemini AI Mengetik...' : '✨ Draf AI Gemini'}
-                </button>
-              </div>
+                {/* Messages Feed */}
+                <div className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3 bg-[#0B0F19]/40">
+                  {activeSession.messages.map((m) => {
+                    const isMe = m.sender === 'agent' || m.sender === 'ai';
+                    return (
+                      <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                        <div
+                          className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-xs shadow-md ${
+                            isMe
+                              ? 'bg-emerald-600 text-white rounded-tr-none'
+                              : 'bg-[#1E2438] text-gray-200 border border-[#2D374E] rounded-tl-none'
+                          }`}
+                        >
+                          <p className="leading-relaxed">{m.text}</p>
+                          <div className="flex items-center justify-end gap-1 mt-1 text-[10px] opacity-75">
+                            <span>{m.timestamp}</span>
+                            {isMe && <CheckCheck className="w-3.5 h-3.5 text-emerald-200" />}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
-              {/* Topic Category Horizontal Scroll */}
-              <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
-                {/* 1. Reservasi */}
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Halo Kak ${activeSession?.customerName || ''}! Salam hangat dari Tropical Garden Resto 🌴. Senang sekali bisa melayani rencana kunjungan Kakak. Boleh kami tahu untuk reservasi berapa orang (pax) dan pada tanggal serta jam berapa ya Kak? Agar kami siapkan spot terbaik untuk Kakak sekeluarga.`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-emerald-600/20 hover:border-emerald-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>🍽️</span>
-                  <span>Salam &amp; Tanya Pax</span>
-                </button>
-
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Untuk kenyamanan bersantap, kami memiliki pilihan area Gazebo Garden VIP (outdoor rindang & asri) dan Grand Dining Room (indoor ber-AC). Kak ${activeSession?.customerName || ''} lebih menyukai suasana area yang mana?`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-emerald-600/20 hover:border-emerald-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>🌴</span>
-                  <span>Spot Gazebo vs Indoor</span>
-                </button>
-
-                {/* 2. Menu & Pre-Order */}
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Halo Kak ${activeSession?.customerName || ''}! Berikut link e-Menu lengkap Tropical Garden Resto 📖: Kami sajikan aneka hidangan Nusantara andalan, Gurame Bakar Madu, Seafood Segar, dan Mocktail Tropis. Mau kami bantu rekomendasikan paket menu favorit?`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-teal-600/20 hover:border-teal-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>📖</span>
-                  <span>Kirim e-Menu</span>
-                </button>
-
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Untuk makan bersama keluarga/rekan, kami sangat merekomendasikan Paket Gurame Bakar Madu + Sup Iga Asam Pedas + Cumi Saus Padang + Sambal Mentah khas Tropical Garden. Porsinya sangat pas, lezat, dan hemat Kak!`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-teal-600/20 hover:border-teal-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>🐟</span>
-                  <span>Rekomendasi Menu Sharing</span>
-                </button>
-
-                {/* 3. Event & Banquet */}
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Halo Kak ${activeSession?.customerName || ''}, terima kasih telah mempercayakan rencana acara spesial Kakak di Tropical Garden Resto 🌿. Boleh kami tahu format acaranya (Gathering/Wedding/Birthday/Arisan) dan estimasi jumlah tamu undangannya Kak?`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-indigo-600/20 hover:border-indigo-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>💍</span>
-                  <span>Tanya Format Event</span>
-                </button>
-
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Kami memiliki Paket Buffet Lengkap dengan Sound System, Mic Wireless, Free Setting Meja, dan VIP Area. Kami juga mengundang Kak ${activeSession?.customerName || ''} untuk sesi Free Food Tasting bersama tim kami!`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-indigo-600/20 hover:border-indigo-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>🍱</span>
-                  <span>Undangan Food Tasting</span>
-                </button>
-
-                {/* 4. DP & Closing */}
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Halo Kak ${activeSession?.customerName || ''}, untuk mengamankan slot tanggal dan area favorit pilihan Kakak, pembayaran DP 50% dapat ditransfer ke Rekening Resmi Resto: BCA 883-990-281 a.n PT TROPICAL GARDEN RESTO. Mohon kirimkan bukti transfernya ya Kak. Terima kasih! 🙏`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-amber-600/20 hover:border-amber-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>💳</span>
-                  <span>Rekening DP Resmi</span>
-                </button>
-
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Terima kasih banyak Kak ${activeSession?.customerName || ''}! Pembayaran DP telah kami terima dan verifikasi di sistem. Surat Konfirmasi Reservasi dan Kwitansi resmi telah kami terbitkan. Seluruh tim siap menyambut acara Kakak dengan sempurna!`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-amber-600/20 hover:border-amber-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>✅</span>
-                  <span>Konfirmasi DP Masuk</span>
-                </button>
-
-                {/* 5. After-Sales */}
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Halo Kak ${activeSession?.customerName || ''}! Terima kasih banyak atas kunjungannya di Tropical Garden Resto kemarin. Semoga pelayanan dan cita rasa hidangan kami berkenan di hati Kakak sekeluarga. Ada masukan atau kesan untuk kami?`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-rose-600/20 hover:border-rose-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>💐</span>
-                  <span>Follow-Up Kepuasan</span>
-                </button>
-
-                <button
-                  onClick={() =>
-                    handleUseAiSuggestion(
-                      `Jika Kak ${activeSession?.customerName || ''} puas dengan pengalaman bersantap di tempat kami, kami sangat berterima kasih bila Kakak berkenan memberikan ulasan bintang 5 di Google Maps kami ⭐️⭐️⭐️⭐️⭐️. Dukungan Kakak sangat berarti bagi kami!`
-                    )
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-[#1E2438] hover:bg-yellow-600/20 hover:border-yellow-500/50 text-gray-200 text-[11px] truncate shrink-0 border border-[#2D374E] cursor-pointer flex items-center gap-1"
-                >
-                  <span>⭐</span>
-                  <span>Minta Google Review</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Input Bar */}
-            <div className="p-3 bg-[#111827] border-t border-[#2D374E] flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Ketik balasan WhatsApp atau pilih template di atas..."
-                value={replyInput}
-                onChange={(e) => setReplyInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                className="flex-1 px-4 py-2.5 bg-[#1E2438] border border-[#2D374E] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={isSending || !replyInput.trim()}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                {isSending ? 'Mengirim...' : 'Kirim'}
-              </button>
-            </div>
+                {/* Reply Box */}
+                <div className="p-3 bg-[#111827] border-t border-[#2D374E]">
+                  <div className="flex items-center gap-2">
+                    <textarea
+                      rows={2}
+                      value={replyInput}
+                      onChange={(e) => setReplyInput(e.target.value)}
+                      placeholder="Ketik pesan balasan ke tamu atau gunakan Gemini AI..."
+                      className="flex-1 p-2.5 bg-[#1E2438] border border-[#2D374E] rounded-xl text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 resize-none"
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={isSending || !replyInput.trim()}
+                      className="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-bold flex items-center justify-center cursor-pointer shadow-lg shadow-emerald-600/30"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* TAB 2: AI CLOSING ASSISTANT */}
+      {/* TAB 2: AI GEMINI ASSISTANT & KEY SETUP */}
       {hubTab === 'ai' && (
         <div className="bg-[#1E2438] border border-[#2D374E] rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex items-center justify-between border-b border-[#2D374E] pb-4">
@@ -562,21 +523,56 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                 <Bot className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white">AI Closing & Quotation Generator</h3>
+                <h3 className="text-base font-bold text-white">Google Gemini AI Engine</h3>
                 <p className="text-xs text-gray-400">
-                  Didukung Gemini AI untuk merancang penawaran paket prasmanan, follow-up prospek dingin, dan menangani komplain secara persuasif.
+                  Model AI: <span className="text-purple-300 font-mono font-bold">gemini-2.0-flash</span> (Multi-Turn Chatbot, Rekomendasi Menu &amp; Auto-Draft)
                 </p>
               </div>
             </div>
           </div>
 
+          {/* Gemini API Key Configuration Card */}
+          <div className="p-4 bg-[#111827] border border-purple-500/30 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white flex items-center gap-2">
+                <Key className="w-4 h-4 text-purple-400" />
+                <span>Pengaturan API Key Google Gemini:</span>
+              </span>
+              {geminiSavedNotice && (
+                <span className="text-xs font-bold text-emerald-400">
+                  ✓ API Key Berhasil Disimpan!
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-gray-400">
+              Dapatkan API Key gratis di <span className="text-purple-300 font-semibold">Google AI Studio (aistudio.google.com)</span> lalu tempelkan di bawah ini:
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="password"
+                placeholder="AIzaSy..."
+                value={geminiKeyInput}
+                onChange={(e) => setGeminiKeyInput(e.target.value)}
+                className="flex-1 px-3.5 py-2.5 bg-[#1E2438] border border-white/10 rounded-xl text-xs text-white font-mono placeholder-gray-600 focus:outline-none focus:border-purple-500"
+              />
+              <button
+                type="button"
+                onClick={handleSaveGeminiKey}
+                className="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/30 cursor-pointer"
+              >
+                Simpan Key
+              </button>
+            </div>
+          </div>
+
+          {/* Preset Prompts */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-[#111827] border border-[#2D374E] space-y-2">
               <span className="text-xs font-bold text-purple-400 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> Generator Penawaran Prasmanan
+                <Sparkles className="w-3.5 h-3.5" /> Penawaran Paket Prasmanan
               </span>
               <p className="text-xs text-gray-300">
-                Buat estimasi biaya paket 50-200 pax dengan bonus free sound system & VIP Gazebo.
+                Estimasi biaya paket 50-200 pax lengkap dengan free sound system &amp; Gazebo VIP.
               </p>
               <button
                 onClick={() => {
@@ -587,13 +583,13 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                 }}
                 className="w-full mt-2 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold cursor-pointer"
               >
-                Gunakan Template Ini
+                Gunakan di Chat
               </button>
             </div>
 
             <div className="p-4 rounded-xl bg-[#111827] border border-[#2D374E] space-y-2">
               <span className="text-xs font-bold text-blue-400 flex items-center gap-1">
-                <HeartHandshake className="w-3.5 h-3.5" /> Re-Engagement Pelanggan Pasif
+                <HeartHandshake className="w-3.5 h-3.5" /> Re-Engagement Tamu Pasif
               </span>
               <p className="text-xs text-gray-300">
                 Sapa kembali tamu yang sudah tidak berkunjung &gt;30 hari dengan voucher makan siang 15%.
@@ -607,7 +603,7 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                 }}
                 className="w-full mt-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer"
               >
-                Gunakan Template Ini
+                Gunakan di Chat
               </button>
             </div>
 
@@ -616,7 +612,7 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                 <Flame className="w-3.5 h-3.5" /> Fast Closing FOMO Promo
               </span>
               <p className="text-xs text-gray-300">
-                Pemberitahuan sisa 1 meja VIP untuk slot jam makan malam malam minggu.
+                Pemberitahuan sisa 1 slot meja VIP Gazebo untuk weekend.
               </p>
               <button
                 onClick={() => {
@@ -627,21 +623,21 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                 }}
                 className="w-full mt-2 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold cursor-pointer"
               >
-                Gunakan Template Ini
+                Gunakan di Chat
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 3: WHATSAPP BLAST & BROADCAST */}
+      {/* TAB 3: WHATSAPP BLAST */}
       {hubTab === 'blast' && (
         <div className="bg-[#1E2438] border border-[#2D374E] rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex items-center justify-between border-b border-[#2D374E] pb-4">
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Share2 className="w-5 h-5 text-emerald-400" />
-                WhatsApp Broadcast & Blast Campaign
+                WhatsApp Broadcast &amp; Blast Campaign
               </h3>
               <p className="text-xs text-gray-400">
                 Kirim pesan massal terpersonalisasi untuk program promo, event seasonal, dan gathering invitation.
@@ -705,7 +701,7 @@ export const UnifiedWhatsAppHub: React.FC = () => {
             </div>
 
             <div className="bg-[#111827] border border-[#2D374E] p-4 rounded-xl space-y-3">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider text-gray-400">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">
                 Log Kampanye Terakhir
               </h4>
               <div className="space-y-2 text-xs">
@@ -729,16 +725,53 @@ export const UnifiedWhatsAppHub: React.FC = () => {
         </div>
       )}
 
-      {/* TAB 4: SESSION & QR LOGIN */}
+      {/* TAB 4: SESSION & REAL BAILEYS QR LOGIN */}
       {hubTab === 'qr' && (
         <div className="bg-[#1E2438] border border-[#2D374E] rounded-2xl p-6 shadow-xl space-y-6">
           <div className="flex flex-col md:flex-row items-center gap-8 justify-center py-6">
-            <div className="p-4 bg-white rounded-2xl shadow-xl flex flex-col items-center">
-              <QrCode className="w-48 h-48 text-gray-900" />
-              <span className="text-[11px] text-gray-500 font-semibold mt-2">
-                Scan via WhatsApp &gt; Perangkat Tertaut
-              </span>
-            </div>
+            {isConnected ? (
+              <div className="p-6 bg-[#111827] border border-emerald-500/40 rounded-2xl shadow-xl flex flex-col items-center text-center max-w-sm">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <h3 className="text-base font-bold text-white">WhatsApp Terhubung Aktif</h3>
+                <p className="text-xs text-emerald-400 font-mono mt-1 font-bold">
+                  {connectedPhone || '+62 812-3456-7890'}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-2">
+                  Sesi Multi-Agent aktif. Seluruh pesan masuk dan keluar otomatis tersinkronisasi dengan database TropicalOS.
+                </p>
+
+                <button
+                  onClick={handleLogoutWa}
+                  disabled={isRefreshingQr}
+                  className="mt-5 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>Logout &amp; Ganti Nomor</span>
+                </button>
+              </div>
+            ) : (
+              <div className="p-4 bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center min-w-[240px] min-h-[240px]">
+                {realQrDataUrl ? (
+                  <img
+                    src={realQrDataUrl}
+                    alt="WhatsApp Web QR Code"
+                    className="w-52 h-52 object-contain"
+                  />
+                ) : (
+                  <div className="w-52 h-52 flex flex-col items-center justify-center text-center p-4">
+                    <QrCode className="w-24 h-24 text-gray-400 animate-pulse mb-2" />
+                    <span className="text-[11px] text-gray-600 font-semibold">
+                      Menghubungkan Baileys Socket...
+                    </span>
+                  </div>
+                )}
+                <span className="text-[10px] text-gray-600 font-bold mt-2">
+                  Scan via WhatsApp &gt; Perangkat Tertaut
+                </span>
+              </div>
+            )}
 
             <div className="space-y-3 max-w-md">
               <div className="flex items-center gap-2">
@@ -746,7 +779,7 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                   1
                 </span>
                 <span className="text-xs text-gray-300 font-medium">
-                  Buka WhatsApp di ponsel outlet / CRM Lead (+62 812-3456-7890)
+                  Buka WhatsApp di ponsel nomor outlet restoran Anda
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -754,7 +787,7 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                   2
                 </span>
                 <span className="text-xs text-gray-300 font-medium">
-                  Ketuk Menu (titik tiga) atau Pengaturan lalu pilih Perangkat Tertaut
+                  Ketuk Menu (titik tiga) atau Pengaturan lalu pilih Perangkat Tertaut (*Linked Devices*)
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -766,13 +799,14 @@ export const UnifiedWhatsAppHub: React.FC = () => {
                 </span>
               </div>
 
-              <div className="pt-3">
+              <div className="pt-3 flex items-center gap-2">
                 <button
-                  onClick={() => setIsConnected(true)}
+                  onClick={fetchGatewayState}
+                  disabled={isRefreshingQr}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer flex items-center gap-2"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  Hubungkan Sesi Sekarang
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingQr ? 'animate-spin' : ''}`} />
+                  Refresh Status QR
                 </button>
               </div>
             </div>

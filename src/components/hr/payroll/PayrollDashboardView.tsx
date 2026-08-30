@@ -27,6 +27,7 @@ import { PayslipModal } from './PayslipModal';
 import { SalaryAdvanceModal } from './SalaryAdvanceModal';
 import { SalaryManagementView } from './SalaryManagementView';
 import { MyPayslipView } from './MyPayslipView';
+import { LaborCostAnalyticsView } from './LaborCostAnalyticsView';
 import {
   DollarSign,
   Calendar,
@@ -76,7 +77,7 @@ export const PayrollDashboardView: React.FC<PayrollDashboardViewProps> = ({
   const canManageSalary = userRole === 'MANAGER' || userRole === 'OWNER';
 
   // Navigation Subtabs
-  const [activeTab, setActiveTab] = useState<'PAYROLL' | 'SALARY_MASTER' | 'MY_PAYSLIP'>('PAYROLL');
+  const [activeTab, setActiveTab] = useState<'PAYROLL' | 'LABOR_COST' | 'SALARY_MASTER' | 'MY_PAYSLIP'>('PAYROLL');
 
   // Period State
   const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
@@ -266,6 +267,18 @@ export const PayrollDashboardView: React.FC<PayrollDashboardViewProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('LABOR_COST')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'LABOR_COST'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30'
+                : 'bg-[#181F32] text-gray-400 hover:text-white border border-[#2D374E]'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <span>Labor Cost % vs Omzet (7shifts)</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('SALARY_MASTER')}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'SALARY_MASTER'
@@ -274,7 +287,7 @@ export const PayrollDashboardView: React.FC<PayrollDashboardViewProps> = ({
             }`}
           >
             <Building2 className="w-4 h-4" />
-            <span>Master Struktur Gaji (24 Pegawai)</span>
+            <span>Master Struktur Gaji</span>
           </button>
 
           <button
@@ -305,6 +318,8 @@ export const PayrollDashboardView: React.FC<PayrollDashboardViewProps> = ({
         <MyPayslipView currentUserId={currentUserId} userRole={userRole} />
       ) : activeTab === 'SALARY_MASTER' ? (
         <SalaryManagementView currentUserId={currentUserId} userRole={userRole} />
+      ) : activeTab === 'LABOR_COST' ? (
+        <LaborCostAnalyticsView />
       ) : (
         <div className="space-y-6">
           {/* Simulation Header Banner & Period Controls */}

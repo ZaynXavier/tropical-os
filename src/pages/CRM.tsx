@@ -17,6 +17,7 @@ import { CrmWhatsAppBlast } from '../components/crm/CrmWhatsAppBlast';
 import { CrmCalendar } from '../components/crm/CrmCalendar';
 import { ContentCalendarView } from '../components/content/ContentCalendarView';
 import { InfluencerCampaignView } from '../components/content/InfluencerCampaignView';
+import { GuestRetentionAutomationView } from '../components/crm/GuestRetentionAutomationView';
 import {
   MOCK_CUSTOMERS,
   MOCK_LEADS,
@@ -118,41 +119,11 @@ export default function CRM() {
 
       case 'whatsapp':
       case 'chat':
-        return (
-          <CrmWhatsApp
-            chats={MOCK_WHATSAPP_CHATS}
-            currentStaffName={currentUser?.fullName || currentUser?.name || 'Tim CRM'}
-          />
-        );
-
-      case 'blast':
-      case 'whatsapp-blast':
-        return (
-          <CrmWhatsAppBlast
-            leads={leads}
-            opportunities={opportunities}
-            customers={customers}
-            onOpenWhatsAppChat={handleOpenWhatsApp}
-          />
-        );
-
-      case 'whatsapp-qr':
-      case 'qr':
-      case 'login':
-        return <WhatsAppQrLoginView />;
-
       case 'whatsapp-unified':
         return <UnifiedWhatsAppHub />;
 
-      case 'reservation':
-      case 'reservation-calendar':
-        return <ReservationCalendarView />;
-
-      case 'follow-up':
-      case 'follow-up-calendar':
-        return <FollowUpCalendarView />;
-
       case 'customers':
+      case 'guests':
         return (
           <CrmCustomers
             customers={customers}
@@ -161,18 +132,9 @@ export default function CRM() {
           />
         );
 
-      case 'leads':
-        return (
-          <CrmLeads
-            leads={leads}
-            onAddLead={handleAddLead}
-            onUpdateLeadStatus={handleUpdateLeadStatus}
-            onConvertToOpportunity={handleConvertToOpportunity}
-            onOpenWhatsApp={handleOpenWhatsApp}
-          />
-        );
-
       case 'pipeline':
+      case 'banquet':
+      case 'deals':
         return (
           <CrmPipeline
             opportunities={opportunities}
@@ -180,6 +142,16 @@ export default function CRM() {
             onOpenAddDeal={() => setSearchParams({ sub: 'leads' })}
           />
         );
+
+      case 'automation':
+      case 'retention':
+      case 'reviews':
+        return <GuestRetentionAutomationView />;
+
+      case 'calendar':
+      case 'reservation':
+      case 'reservation-calendar':
+        return <ReservationCalendarView />;
 
       case 'content':
       case 'marketing':
@@ -196,9 +168,8 @@ export default function CRM() {
           </div>
         );
 
-      case 'calendar':
       default:
-        return <CrmCalendar opportunities={opportunities} activities={MOCK_ACTIVITIES} />;
+        return <UnifiedWhatsAppHub />;
     }
   };
 

@@ -1,6 +1,0 @@
-.git
-vendor
-node_modules
-storage/logs/*
-whatsapp-gateway
-.env

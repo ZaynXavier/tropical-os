@@ -36,10 +36,10 @@ import {
 
 export const EmployeeManagementView: React.FC = () => {
   const { currentUser, hasRole } = useAuth();
-  const isManager = hasRole('MANAGER');
-  const isOwner = hasRole('OWNER');
-  const isSupervisor = hasRole('SUPERVISOR');
-  const canManage = isManager; // Only Manager can mutate master data
+  const isManager = hasRole('MANAGER') || currentUser?.accessLevel === 'MANAGER';
+  const isOwner = hasRole('OWNER') || currentUser?.accessLevel === 'OWNER';
+  const isSupervisor = hasRole('SUPERVISOR') || currentUser?.accessLevel === 'SUPERVISOR';
+  const canManage = isManager || isOwner; // Manager, Owner & HR can mutate master data
 
   // Data states
   const [employees, setEmployees] = useState<Employee[]>([]);
