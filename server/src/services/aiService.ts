@@ -54,8 +54,8 @@ export const aiService = {
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+      const data: any = await response.json();
+      if (data && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
         return data.candidates[0].content.parts[0].text.trim();
       }
 

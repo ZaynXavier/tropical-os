@@ -54,9 +54,9 @@ router.post('/whatsapp/send', async (req: Request, res: Response) => {
     const isSent = await whatsappService.sendMessage(phone, message);
 
     // Also record in database
-    const session = await prisma.whatsappSession.findUnique({ where: { phone } });
+    const session = await prisma.whatsAppSession.findFirst({ where: { phone } });
     if (session) {
-      await prisma.chatMessage.create({
+      await prisma.whatsAppMessage.create({
         data: {
           sessionId: session.id,
           sender: 'agent',
@@ -64,7 +64,7 @@ router.post('/whatsapp/send', async (req: Request, res: Response) => {
           status: isSent ? 'delivered' : 'sent',
         },
       });
-      await prisma.whatsappSession.update({
+      await prisma.whatsAppSession.update({
         where: { id: session.id },
         data: {
           lastMessage: message,
@@ -92,12 +92,12 @@ router.post('/whatsapp/logout', async (_req: Request, res: Response) => {
 // GET /api/v1/crm/whatsapp/chats
 router.get('/whatsapp/chats', async (_req: Request, res: Response) => {
   try {
-    const sessions = await prisma.whatsappSession.findMany({
+    const sessions = await prisma.whatsAppSession.findMany({
       include: { messages: { orderBy: { timestamp: 'asc' } } },
       orderBy: { updatedAt: 'desc' },
     });
 
-    const mapped = sessions.map((s) => ({
+    const mapped = (sessions || []).map((s) => ({
       id: s.id,
       customerName: s.customerName,
       phone: s.phone,
@@ -105,11 +105,11 @@ router.get('/whatsapp/chats', async (_req: Request, res: Response) => {
       unreadCount: s.unreadCount,
       timestamp: s.lastTime || 'Baru saja',
       tags: s.tags ? s.tags.split(',') : ['Live Sync'],
-      messages: s.messages.map((m) => ({
+      messages: (s.messages || []).map((m) => ({
         id: m.id,
         sender: m.sender,
         text: m.text,
-        timestamp: m.timestamp.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: m.timestamp instanceof Date ? m.timestamp.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : String(m.timestamp || ''),
         status: m.status,
       })),
     }));

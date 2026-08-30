@@ -30,7 +30,6 @@ export const whatsappService = {
     }
 
     try {
-      // Dynamic import of Baileys for seamless CJS/ESM compatibility on Windows
       const baileys = await import('@whiskeysockets/baileys');
       const makeWASocket = baileys.default || baileys.makeWASocket;
       const { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = baileys;
@@ -116,24 +115,24 @@ export const whatsappService = {
           const customerName = msg.pushName || `Tamu (${phone})`;
 
           try {
-            let session = await prisma.whatsappSession.findUnique({
-              where: { phone },
+            let session = await prisma.whatsAppSession.findUnique({
+              where: { remoteJid: senderJid },
             });
 
             if (!session) {
-              session = await prisma.whatsappSession.create({
+              session = await prisma.whatsAppSession.create({
                 data: {
+                  remoteJid: senderJid,
                   phone,
                   customerName,
                   lastMessage: text,
                   lastTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
                   unreadCount: 1,
-                  status: 'ACTIVE',
                   tags: 'Live WhatsApp',
                 },
               });
             } else {
-              await prisma.whatsappSession.update({
+              await prisma.whatsAppSession.update({
                 where: { id: session.id },
                 data: {
                   lastMessage: text,
@@ -143,7 +142,7 @@ export const whatsappService = {
               });
             }
 
-            await prisma.chatMessage.create({
+            await prisma.whatsAppMessage.create({
               data: {
                 sessionId: session.id,
                 sender: 'customer',
@@ -165,7 +164,7 @@ export const whatsappService = {
               }
 
               // Record AI reply in database
-              await prisma.chatMessage.create({
+              await prisma.whatsAppMessage.create({
                 data: {
                   sessionId: session.id,
                   sender: 'ai',
@@ -174,7 +173,7 @@ export const whatsappService = {
                 },
               });
 
-              await prisma.whatsappSession.update({
+              await prisma.whatsAppSession.update({
                 where: { id: session.id },
                 data: {
                   lastMessage: `[AI]: ${aiReply}`,
@@ -191,7 +190,6 @@ export const whatsappService = {
       });
     } catch (err: any) {
       console.warn('[WhatsApp Gateway] Baileys runtime note:', err?.message || err);
-      // Generate a ready local QR code for instant demonstration if offline
       if (!currentQrDataUrl) {
         currentQrDataUrl = await QRCode.toDataURL(`TROPICALOS-WA-SESSION-${Date.now()}`, {
           margin: 2,
